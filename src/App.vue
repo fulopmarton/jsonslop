@@ -2,6 +2,7 @@
 // JSON Visualization App - Main Application Component
 import { ref } from 'vue'
 import JSONInputPanel from '@/components/JSONInputPanel.vue'
+import VisualizationPanel from '@/components/VisualizationPanel.vue'
 
 // State for managing the resizable split pane
 const isResizing = ref(false)
@@ -56,21 +57,8 @@ const stopResize = () => {
           <h2 class="text-lg font-semibold text-gray-800">JSON Visualization</h2>
           <p class="text-sm text-gray-600">Interactive tree view of your JSON data</p>
         </div>
-        <div class="flex-1 p-4 overflow-auto">
-          <!-- Visualization Panel will be implemented in task 8 -->
-          <div
-            class="h-full bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
-            <div class="text-center text-gray-500">
-              <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M8 5a2 2 0 012-2h2a2 2 0 012 2v2H8V5z" />
-              </svg>
-              <p class="text-sm font-medium">Visualization Panel</p>
-              <p class="text-xs mt-1">Will be implemented in task 8</p>
-            </div>
-          </div>
+        <div class="flex-1 overflow-hidden">
+          <VisualizationPanel />
         </div>
       </div>
     </main>

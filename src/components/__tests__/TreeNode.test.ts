@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import TreeNode from '../TreeNode.vue'
 import type { JSONNode } from '@/types'
 
@@ -16,6 +17,13 @@ Object.assign(document, {
 })
 
 describe('TreeNode', () => {
+  let pinia: ReturnType<typeof createPinia>
+
+  beforeEach(() => {
+    pinia = createPinia()
+    setActivePinia(pinia)
+  })
+
   const createMockNode = (overrides: Partial<JSONNode> = {}): JSONNode => ({
     key: 'test',
     value: 'test value',
@@ -24,6 +32,16 @@ describe('TreeNode', () => {
     isExpandable: false,
     ...overrides,
   })
+
+  const mountTreeNode = (props: unknown) => {
+    return mount(TreeNode, {
+      ...props,
+      global: {
+        plugins: [pinia],
+        ...(props.global || {}),
+      },
+    })
+  }
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -37,7 +55,7 @@ describe('TreeNode', () => {
         type: 'string',
       })
 
-      const wrapper = mount(TreeNode, {
+      const wrapper = mountTreeNode({
         props: { node },
       })
 
@@ -53,7 +71,7 @@ describe('TreeNode', () => {
         type: 'number',
       })
 
-      const wrapper = mount(TreeNode, {
+      const wrapper = mountTreeNode({
         props: { node },
       })
 
@@ -69,7 +87,7 @@ describe('TreeNode', () => {
         type: 'boolean',
       })
 
-      const wrapper = mount(TreeNode, {
+      const wrapper = mountTreeNode({
         props: { node },
       })
 
@@ -84,7 +102,7 @@ describe('TreeNode', () => {
         type: 'null',
       })
 
-      const wrapper = mount(TreeNode, {
+      const wrapper = mountTreeNode({
         props: { node },
       })
 
@@ -100,7 +118,7 @@ describe('TreeNode', () => {
         type: 'string',
       })
 
-      const wrapper = mount(TreeNode, {
+      const wrapper = mountTreeNode({
         props: { node },
       })
 
@@ -126,7 +144,7 @@ describe('TreeNode', () => {
         ],
       })
 
-      const wrapper = mount(TreeNode, {
+      const wrapper = mountTreeNode({
         props: { node },
       })
 
@@ -148,7 +166,7 @@ describe('TreeNode', () => {
         ],
       })
 
-      const wrapper = mount(TreeNode, {
+      const wrapper = mountTreeNode({
         props: { node },
       })
 
@@ -171,7 +189,7 @@ describe('TreeNode', () => {
         ],
       })
 
-      const wrapper = mount(TreeNode, {
+      const wrapper = mountTreeNode({
         props: {
           node,
           isExpanded: true,
@@ -204,7 +222,7 @@ describe('TreeNode', () => {
         ],
       })
 
-      const wrapper = mount(TreeNode, {
+      const wrapper = mountTreeNode({
         props: {
           node,
           isExpanded: false,
@@ -232,7 +250,7 @@ describe('TreeNode', () => {
         path: ['root', 'user'],
       })
 
-      const wrapper = mount(TreeNode, {
+      const wrapper = mountTreeNode({
         props: { node },
       })
 
@@ -247,7 +265,7 @@ describe('TreeNode', () => {
         path: ['root', 'test'],
       })
 
-      const wrapper = mount(TreeNode, {
+      const wrapper = mountTreeNode({
         props: { node },
       })
 
@@ -262,7 +280,7 @@ describe('TreeNode', () => {
         key: 'testKey',
       })
 
-      const wrapper = mount(TreeNode, {
+      const wrapper = mountTreeNode({
         props: { node },
       })
 
@@ -278,7 +296,7 @@ describe('TreeNode', () => {
         type: 'string',
       })
 
-      const wrapper = mount(TreeNode, {
+      const wrapper = mountTreeNode({
         props: { node },
       })
 
@@ -293,7 +311,7 @@ describe('TreeNode', () => {
     it('applies selected styling when isSelected is true', () => {
       const node = createMockNode()
 
-      const wrapper = mount(TreeNode, {
+      const wrapper = mountTreeNode({
         props: {
           node,
           isSelected: true,
@@ -307,7 +325,7 @@ describe('TreeNode', () => {
     it('applies highlighted styling when isHighlighted is true', () => {
       const node = createMockNode()
 
-      const wrapper = mount(TreeNode, {
+      const wrapper = mountTreeNode({
         props: {
           node,
           isHighlighted: true,
@@ -320,7 +338,7 @@ describe('TreeNode', () => {
     it('shows copy button on hover', async () => {
       const node = createMockNode()
 
-      const wrapper = mount(TreeNode, {
+      const wrapper = mountTreeNode({
         props: { node },
       })
 
@@ -342,7 +360,7 @@ describe('TreeNode', () => {
         isExpandable: true,
       })
 
-      const wrapper = mount(TreeNode, {
+      const wrapper = mountTreeNode({
         props: {
           node,
           isExpanded: true,
@@ -357,7 +375,7 @@ describe('TreeNode', () => {
     it('applies correct indentation based on depth', () => {
       const node = createMockNode()
 
-      const wrapper = mount(TreeNode, {
+      const wrapper = mountTreeNode({
         props: {
           node,
           depth: 3,
@@ -371,7 +389,7 @@ describe('TreeNode', () => {
     it('has default depth of 0', () => {
       const node = createMockNode()
 
-      const wrapper = mount(TreeNode, {
+      const wrapper = mountTreeNode({
         props: { node },
       })
 
@@ -389,7 +407,7 @@ describe('TreeNode', () => {
         isExpandable: true,
       })
 
-      const wrapper = mount(TreeNode, {
+      const wrapper = mountTreeNode({
         props: { node },
       })
 
@@ -414,7 +432,7 @@ describe('TreeNode', () => {
         value: 'test value',
       })
 
-      const wrapper = mount(TreeNode, {
+      const wrapper = mountTreeNode({
         props: { node },
       })
 
@@ -436,7 +454,7 @@ describe('TreeNode', () => {
         isExpandable: true,
       })
 
-      const wrapper = mount(TreeNode, {
+      const wrapper = mountTreeNode({
         props: {
           node,
           isExpanded: false,
@@ -452,7 +470,7 @@ describe('TreeNode', () => {
         isExpandable: true,
       })
 
-      const wrapper = mount(TreeNode, {
+      const wrapper = mountTreeNode({
         props: {
           node,
           isExpanded: true,
@@ -468,7 +486,7 @@ describe('TreeNode', () => {
         value: 'testValue',
       })
 
-      const wrapper = mount(TreeNode, {
+      const wrapper = mountTreeNode({
         props: { node },
       })
 
