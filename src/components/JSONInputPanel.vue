@@ -1,0 +1,408 @@
+<template>
+    <div class="json-input-panel h-full flex flex-col bg-white border-r border-gray-200">
+        <!-- Header -->
+        <div class="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
+            <h2 class="text-lg font-semibold text-gray-800">JSON Input</h2>
+            <div class="flex items-center gap-2">
+                <!-- Validation Status -->
+                <div class="flex items-center gap-2">
+                    <div v-if="isValidating" class="flex items-center gap-2 text-blue-600">
+                        <div class="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin">
+                        </div>
+                        <span class="text-sm">Validating...</span>
+                    </div>
+                    <div v-else-if="hasValidJson && !hasErrorsComputed" class="flex items-center gap-2 text-green-600">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd"
+                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                clip-rule="evenodd" />
+                        </svg>
+                        <span class="text-sm">Valid JSON</span>
+                    </div>
+                    <div v-else-if="hasErrorsComputed" class="flex items-center gap-2 text-red-600">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd"
+                                d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                                clip-rule="evenodd" />
+                        </svg>
+                        <span class="text-sm">{{ validationErrors.length }} error{{ validationErrors.length !== 1 ? 's'
+                            : '' }}</span>
+                    </div>
+                </div>
+
+                <!-- Clear Button -->
+                <button @click="clearInput" :disabled="!rawJsonInput.trim()"
+                    class="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 text-gray-700 rounded border transition-colors"
+                    title="Clear input">
+                    Clear
+                </button>
+            </div>
+        </div>
+
+        <!-- Editor Container -->
+        <div class="flex-1 relative">
+            <div ref="editorContainer" class="absolute inset-0"></div>
+
+            <!-- Loading Overlay -->
+            <div v-if="isProcessing"
+                class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
+                <div class="flex items-center gap-3 text-gray-600">
+                    <div class="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                    <span>{{ processingMessage || 'Processing...' }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error Display -->
+        <div v-if="hasErrorsComputed || hasWarningsComputed"
+            class="border-t border-gray-200 bg-red-50 max-h-32 overflow-y-auto">
+            <div class="p-3">
+                <div class="space-y-2">
+                    <!-- Errors -->
+                    <div v-for="error in validationErrors" :key="`error-${error.line}-${error.column}`"
+                        class="flex items-start gap-2 text-sm">
+                        <svg class="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd"
+                                d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                                clip-rule="evenodd" />
+                        </svg>
+                        <div>
+                            <span class="text-red-700 font-medium">Line {{ error.line }}, Column {{ error.column
+                            }}:</span>
+                            <span class="text-red-600 ml-1">{{ error.message }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Warnings -->
+                    <div v-for="warning in validationWarnings" :key="`warning-${warning.line}-${warning.column}`"
+                        class="flex items-start gap-2 text-sm">
+                        <svg class="w-4 h-4 text-yellow-500 mt-0.5 flex-shrink-0" fill="currentColor"
+                            viewBox="0 0 20 20">
+                            <path fill-rule="evenodd"
+                                d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                                clip-rule="evenodd" />
+                        </svg>
+                        <div>
+                            <span class="text-yellow-700 font-medium">Line {{ warning.line }}, Column {{ warning.column
+                            }}:</span>
+                            <span class="text-yellow-600 ml-1">{{ warning.message }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Suggestions -->
+        <div v-if="validationSuggestions.length > 0"
+            class="border-t border-gray-200 bg-blue-50 max-h-24 overflow-y-auto">
+            <div class="p-3">
+                <div class="text-sm text-blue-700 font-medium mb-1">Suggestions:</div>
+                <ul class="space-y-1">
+                    <li v-for="(suggestion, index) in validationSuggestions" :key="index" class="text-sm text-blue-600">
+                        • {{ suggestion }}
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useJsonStore } from '@/stores/json'
+import * as monaco from 'monaco-editor'
+import loader from '@monaco-editor/loader'
+
+// Store integration
+const jsonStore = useJsonStore()
+const {
+    rawJsonInput,
+    validationErrors,
+    validationWarnings,
+    validationSuggestions,
+    isValidating,
+    isProcessing,
+    processingMessage,
+    hasValidJson,
+
+    uiPreferences
+} = storeToRefs(jsonStore)
+
+// Component refs
+const editorContainer = ref<HTMLElement>()
+let editor: monaco.editor.IStandaloneCodeEditor | null = null
+let monacoInstance: typeof monaco | null = null
+
+// Editor state
+const isEditorReady = ref(false)
+const editorValue = ref('')
+
+// Computed properties
+const hasContent = computed(() => rawJsonInput.value.trim().length > 0)
+const hasErrorsComputed = computed(() => validationErrors.value.length > 0)
+const hasWarningsComputed = computed(() => validationWarnings.value.length > 0)
+
+// Initialize Monaco Editor
+const initializeEditor = async () => {
+    if (!editorContainer.value) return
+
+    try {
+        // Configure Monaco loader
+        loader.config({
+            paths: {
+                vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.53.0/min/vs'
+            }
+        })
+
+        // Load Monaco
+        monacoInstance = await loader.init()
+
+        // Configure JSON language
+        monacoInstance.languages.json.jsonDefaults.setDiagnosticsOptions({
+            validate: true,
+            allowComments: false,
+            schemas: [],
+            enableSchemaRequest: false
+        })
+
+        // Create editor
+        editor = monacoInstance.editor.create(editorContainer.value, {
+            value: rawJsonInput.value,
+            language: 'json',
+            theme: getEditorTheme(),
+            fontSize: getEditorFontSize(),
+            lineNumbers: uiPreferences.value.showLineNumbers ? 'on' : 'off',
+            minimap: { enabled: false },
+            scrollBeyondLastLine: false,
+            automaticLayout: true,
+            wordWrap: 'on',
+            formatOnPaste: uiPreferences.value.autoFormat,
+            formatOnType: uiPreferences.value.autoFormat,
+            tabSize: 2,
+            insertSpaces: true,
+            detectIndentation: false,
+            folding: true,
+            foldingHighlight: true,
+            showFoldingControls: 'always',
+            bracketPairColorization: {
+                enabled: true
+            },
+            guides: {
+                bracketPairs: true,
+                indentation: true
+            }
+        })
+
+        // Set up event listeners
+        setupEditorEventListeners()
+
+        // Update editor decorations based on validation errors
+        updateErrorDecorations()
+
+        isEditorReady.value = true
+    } catch (error) {
+        console.error('Failed to initialize Monaco Editor:', error)
+    }
+}
+
+// Set up editor event listeners
+const setupEditorEventListeners = () => {
+    if (!editor) return
+
+    // Listen for content changes
+    editor.onDidChangeModelContent(() => {
+        if (editor) {
+            const value = editor.getValue()
+            editorValue.value = value
+
+            // Debounced update to store
+            debounceUpdateStore(value)
+        }
+    })
+
+    // Listen for cursor position changes to show context
+    editor.onDidChangeCursorPosition((e) => {
+        // Could be used for showing context information
+    })
+}
+
+// Debounced store update
+let updateTimeout: NodeJS.Timeout | null = null
+const debounceUpdateStore = (value: string) => {
+    if (updateTimeout) {
+        clearTimeout(updateTimeout)
+    }
+
+    updateTimeout = setTimeout(() => {
+        jsonStore.updateJsonInput(value)
+    }, 300) // 300ms debounce
+}
+
+// Update error decorations in editor
+const updateErrorDecorations = () => {
+    if (!editor || !monacoInstance) return
+
+    const decorations: monaco.editor.IModelDeltaDecoration[] = []
+
+    // Add error decorations
+    validationErrors.value.forEach((error) => {
+        decorations.push({
+            range: new monacoInstance.Range(error.line, error.column, error.line, error.column + 1),
+            options: {
+                isWholeLine: false,
+                className: 'error-decoration',
+                glyphMarginClassName: 'error-glyph',
+                hoverMessage: { value: error.message },
+                minimap: {
+                    color: '#ff0000',
+                    position: monacoInstance.editor.MinimapPosition.Inline
+                }
+            }
+        })
+    })
+
+    // Add warning decorations
+    validationWarnings.value.forEach((warning) => {
+        decorations.push({
+            range: new monacoInstance.Range(warning.line, warning.column, warning.line, warning.column + 1),
+            options: {
+                isWholeLine: false,
+                className: 'warning-decoration',
+                glyphMarginClassName: 'warning-glyph',
+                hoverMessage: { value: warning.message },
+                minimap: {
+                    color: '#ffaa00',
+                    position: monacoInstance.editor.MinimapPosition.Inline
+                }
+            }
+        })
+    })
+
+    editor.deltaDecorations([], decorations)
+}
+
+// Get editor theme based on preferences
+const getEditorTheme = (): string => {
+    switch (uiPreferences.value.theme) {
+        case 'dark':
+            return 'vs-dark'
+        case 'light':
+            return 'vs'
+        default:
+            // Auto theme - could detect system preference
+            return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'vs-dark' : 'vs'
+    }
+}
+
+// Get editor font size based on preferences
+const getEditorFontSize = (): number => {
+    switch (uiPreferences.value.fontSize) {
+        case 'small':
+            return 12
+        case 'large':
+            return 16
+        default:
+            return 14
+    }
+}
+
+// Clear input
+const clearInput = () => {
+    if (editor) {
+        editor.setValue('')
+    }
+    jsonStore.clearAllData()
+}
+
+// Format JSON
+const formatJson = () => {
+    if (editor && hasValidJson.value) {
+        editor.getAction('editor.action.formatDocument')?.run()
+    }
+}
+
+// Watch for external changes to rawJsonInput
+watch(rawJsonInput, (newValue) => {
+    if (editor && newValue !== editorValue.value) {
+        editor.setValue(newValue)
+        editorValue.value = newValue
+    }
+})
+
+// Watch for validation errors to update decorations
+watch([validationErrors, validationWarnings], () => {
+    updateErrorDecorations()
+}, { deep: true })
+
+// Watch for UI preference changes
+watch(() => uiPreferences.value.theme, (newTheme) => {
+    if (editor && monacoInstance) {
+        monacoInstance.editor.setTheme(getEditorTheme())
+    }
+})
+
+watch(() => uiPreferences.value.fontSize, (newSize) => {
+    if (editor) {
+        editor.updateOptions({ fontSize: getEditorFontSize() })
+    }
+})
+
+watch(() => uiPreferences.value.showLineNumbers, (showLineNumbers) => {
+    if (editor) {
+        editor.updateOptions({ lineNumbers: showLineNumbers ? 'on' : 'off' })
+    }
+})
+
+// Lifecycle hooks
+onMounted(() => {
+    initializeEditor()
+})
+
+onUnmounted(() => {
+    if (updateTimeout) {
+        clearTimeout(updateTimeout)
+    }
+    if (editor) {
+        editor.dispose()
+    }
+})
+
+// Expose methods for parent components
+defineExpose({
+    formatJson,
+    clearInput,
+    focusEditor: () => editor?.focus()
+})
+</script>
+
+<style scoped>
+/* Custom styles for Monaco Editor decorations */
+:deep(.error-decoration) {
+    background-color: rgba(255, 0, 0, 0.1);
+    border-bottom: 2px wavy #ff0000;
+}
+
+:deep(.warning-decoration) {
+    background-color: rgba(255, 170, 0, 0.1);
+    border-bottom: 2px wavy #ffaa00;
+}
+
+:deep(.error-glyph) {
+    background-color: #ff0000;
+    width: 4px !important;
+    margin-left: 2px;
+}
+
+:deep(.warning-glyph) {
+    background-color: #ffaa00;
+    width: 4px !important;
+    margin-left: 2px;
+}
+
+/* Ensure the editor container takes full height */
+.json-input-panel {
+    min-height: 0;
+    /* Allow flex child to shrink */
+}
+</style>

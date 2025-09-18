@@ -21,21 +21,21 @@
   - Write comprehensive unit tests for various JSON formats and error cases
   - _Requirements: 1.2, 1.3, 5.1, 5.2, 5.4_
 
-- [-] 4. Set up Pinia store for state management
+- [x] 4. Set up Pinia store for state management
   - Create main JSON store using Pinia for global state management
   - Implement reactive state for JSON data, validation errors, and UI preferences
   - Add actions for updating JSON, handling validation, and managing tree state
   - Write tests for store actions and state mutations
   - _Requirements: 4.1, 3.4_
 
-- [ ] 5. Build basic app layout structure
+- [x] 5. Build basic app layout structure
   - Create main App.vue component with split-pane layout using Tailwind CSS
   - Implement responsive design with CSS Grid and Flexbox
   - Add basic styling and theme setup with Tailwind configuration
   - Ensure layout works on different screen sizes
   - _Requirements: 4.1, 4.4_
 
-- [ ] 6. Implement JSON input panel with Monaco Editor
+- [x] 6. Implement JSON input panel with Monaco Editor
   - Create JSONInputPanel.vue component with Monaco Editor integration
   - Add syntax highlighting for JSON and error highlighting
   - Implement real-time validation with error display

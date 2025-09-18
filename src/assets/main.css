@@ -1,36 +1,49 @@
 @import 'tailwindcss';
 @import './base.css';
 
+/* JSON Visualization App Styles */
 #app {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
   font-weight: normal;
 }
 
-a,
-.green {
+/* Ensure full height layout */
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* Link styles for future use */
+a {
   text-decoration: none;
-  color: hsla(160, 100%, 37%, 1);
-  transition: 0.4s;
-  padding: 3px;
+  color: #3b82f6;
+  transition: color 0.2s ease-in-out;
 }
 
-@media (hover: hover) {
-  a:hover {
-    background-color: hsla(160, 100%, 37%, 0.2);
-  }
+a:hover {
+  color: #1d4ed8;
 }
 
-@media (min-width: 1024px) {
-  body {
-    display: flex;
-    place-items: center;
-  }
+/* Focus styles for accessibility */
+button:focus,
+input:focus,
+textarea:focus,
+select:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
 
-  #app {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    padding: 0 2rem;
-  }
+/* Custom utility classes */
+.panel-header {
+  @apply px-4 py-3 border-b border-gray-200 bg-gray-50;
+}
+
+.panel-content {
+  @apply flex-1 p-4 overflow-auto;
+}
+
+/* Responsive breakpoints for mobile handling */
+@media (max-width: 767px) {
+  /* Mobile styles will be handled by the component */
 }
