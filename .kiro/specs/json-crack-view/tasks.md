@@ -27,7 +27,7 @@
   - Write tests for view switching functionality and state preservation
   - _Requirements: 1.1, 1.3_
 
-- [-] 5. Build GraphCanvas component with D3 SVG rendering
+- [x] 5. Build GraphCanvas component with D3 SVG rendering
   - Create Vue component that initializes D3 SVG container and manages dimensions
   - Implement D3 force simulation setup with configurable parameters
   - Add zoom and pan functionality using D3 zoom behavior
@@ -35,7 +35,7 @@
   - Write tests for canvas initialization and D3 integration
   - _Requirements: 2.4, 4.3, 4.4_
 
-- [ ] 6. Implement GraphNode component for individual node rendering
+- [x] 6. Implement GraphNode component for individual node rendering
   - Create component that renders different node types (object, array, primitive) with distinct visual styles
   - Add hover effects and tooltip display using Vue reactivity
   - Implement click handling for node selection and double-click for focus
@@ -43,7 +43,7 @@
   - Write tests for node rendering and interaction behaviors
   - _Requirements: 2.1, 2.2, 2.5, 3.1, 3.5_
 
-- [ ] 7. Create force-directed layout implementation
+- [x] 7. Create force-directed layout implementation
   - Implement D3 force simulation with link, many-body, center, and collision forces
   - Add configurable force parameters for different JSON structure types
   - Create smooth animation updates when simulation ticks
@@ -51,7 +51,7 @@
   - Write tests for layout algorithm behavior and performance
   - _Requirements: 4.1, 4.2, 4.4_
 
-- [ ] 8. Add graph interaction features
+- [x] 8. Add graph interaction features
   - Implement context menu for nodes with copy functionality
   - Add node selection highlighting and connection emphasis
   - Create keyboard navigation support for accessibility
@@ -59,7 +59,7 @@
   - Write tests for all interaction features and edge cases
   - _Requirements: 3.1, 3.2, 3.3, 3.5_
 
-- [ ] 9. Integrate search functionality with graph view
+- [x] 9. Integrate search functionality with graph view
   - Extend existing search composable to work with graph nodes
   - Implement node highlighting and dimming for search results
   - Add search result navigation that centers view on matching nodes
@@ -67,7 +67,7 @@
   - Write tests for search integration and result highlighting
   - _Requirements: 5.1, 5.2, 5.3, 5.4_
 
-- [ ] 10. Create GraphControls component for graph manipulation
+- [x] 10. Create GraphControls component for graph manipulation
   - Implement zoom in/out controls and reset to fit functionality
   - Add layout algorithm selection (force-directed, hierarchical, tree)
   - Create minimap component for navigation in large graphs

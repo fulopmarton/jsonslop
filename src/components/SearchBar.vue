@@ -72,30 +72,71 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import { useJsonStore } from '@/stores/json'
 import { useDebouncedSearch } from '@/composables/useDebouncedSearch'
+import { useGraphSearch } from '@/composables/useGraphSearch'
 
 // Store
 const jsonStore = useJsonStore()
 
-// Debounced search composable
+// Search composables
 const debouncedSearch = useDebouncedSearch({
     delay: 300,
     minLength: 1,
     immediate: false
 })
 
+const graphSearch = useGraphSearch({
+    caseSensitive: false,
+    matchWholeWords: false,
+    searchKeys: true,
+    searchValues: true,
+    highlightConnections: true,
+})
+
 // Local refs
 const searchInput = ref<HTMLInputElement>()
 
-// Use debounced search state
+// Current view from store
+const currentView = computed(() => jsonStore.currentView)
+
+// Use appropriate search based on current view
 const searchQuery = computed({
-    get: () => debouncedSearch.searchInput.value,
-    set: (value: string) => debouncedSearch.updateSearchInput(value)
+    get: () => {
+        return currentView.value === 'graph'
+            ? graphSearch.searchQuery.value
+            : debouncedSearch.searchInput.value
+    },
+    set: (value: string) => {
+        if (currentView.value === 'graph') {
+            graphSearch.searchQuery.value = value
+        } else {
+            debouncedSearch.updateSearchInput(value)
+        }
+    }
 })
 
-const searchResults = computed(() => debouncedSearch.searchResults.value)
-const currentSearchIndex = computed(() => debouncedSearch.currentSearchIndex.value)
-const hasSearchResults = computed(() => debouncedSearch.hasSearchResults.value)
-const isSearching = computed(() => debouncedSearch.isSearching.value)
+const searchResults = computed(() => {
+    return currentView.value === 'graph'
+        ? graphSearch.graphSearchResults.value.map(r => r.nodeId)
+        : debouncedSearch.searchResults.value
+})
+
+const currentSearchIndex = computed(() => {
+    return currentView.value === 'graph'
+        ? graphSearch.currentGraphSearchIndex.value
+        : debouncedSearch.currentSearchIndex.value
+})
+
+const hasSearchResults = computed(() => {
+    return currentView.value === 'graph'
+        ? graphSearch.hasGraphSearchResults.value
+        : debouncedSearch.hasSearchResults.value
+})
+
+const isSearching = computed(() => {
+    return currentView.value === 'graph'
+        ? graphSearch.isSearching.value
+        : debouncedSearch.isSearching.value
+})
 
 // Methods
 const handleSearchInput = () => {
@@ -112,17 +153,29 @@ const handleEnterKey = (event: KeyboardEvent) => {
 }
 
 const navigateToNext = () => {
-    debouncedSearch.navigateToNext()
-    scrollToCurrentResult()
+    if (currentView.value === 'graph') {
+        graphSearch.navigateToNextGraphResult()
+    } else {
+        debouncedSearch.navigateToNext()
+        scrollToCurrentResult()
+    }
 }
 
 const navigateToPrevious = () => {
-    debouncedSearch.navigateToPrevious()
-    scrollToCurrentResult()
+    if (currentView.value === 'graph') {
+        graphSearch.navigateToPreviousGraphResult()
+    } else {
+        debouncedSearch.navigateToPrevious()
+        scrollToCurrentResult()
+    }
 }
 
 const clearSearch = () => {
-    debouncedSearch.clearSearch()
+    if (currentView.value === 'graph') {
+        graphSearch.clearGraphSearch()
+    } else {
+        debouncedSearch.clearSearch()
+    }
     focusSearchInput()
 }
 

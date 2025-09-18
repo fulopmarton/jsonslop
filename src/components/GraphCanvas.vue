@@ -24,28 +24,29 @@
             <div class="loading-spinner"></div>
             <span>Rendering graph...</span>
         </div>
+
+        <!-- Context Menu -->
+        <ContextMenu :is-visible="contextMenu.isVisible" :x="contextMenu.x" :y="contextMenu.y" :items="contextMenuItems"
+            @close="hideContextMenu" />
     </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue'
-import type { GraphNode, GraphLink, LayoutType } from '@/types'
+import type { GraphNode, GraphLink, LayoutType, ForceLayoutOptions, LayoutStats } from '@/types'
 import {
     select,
-    forceSimulation,
-    forceLink,
-    forceManyBody,
-    forceCenter,
-    forceCollide,
     zoom,
     zoomIdentity,
     type D3Selection,
-    type D3Simulation,
     type D3ZoomBehavior,
     type ZoomTransform,
-    type SimulationNodeDatum,
-    type SimulationLinkDatum
 } from '@/utils/d3-imports'
+import { ForceLayout } from '@/utils/force-layout'
+import ContextMenu from './ContextMenu.vue'
+import { useGraphInteractions } from '@/composables/useGraphInteractions'
+import { useGraphKeyboardNavigation } from '@/composables/useGraphKeyboardNavigation'
+import { useGraphSearch } from '@/composables/useGraphSearch'
 
 // Props
 interface Props {
@@ -56,11 +57,7 @@ interface Props {
     layoutType?: LayoutType
     selectedNodeId?: string | null
     highlightedNodes?: Set<string>
-    forceStrength?: number
-    linkDistance?: number
-    centerForce?: number
-    collisionRadius?: number
-    alphaDecay?: number
+    forceOptions?: Partial<ForceLayoutOptions>
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -69,11 +66,7 @@ const props = withDefaults(defineProps<Props>(), {
     layoutType: 'force',
     selectedNodeId: null,
     highlightedNodes: () => new Set(),
-    forceStrength: -300,
-    linkDistance: 50,
-    centerForce: 1,
-    collisionRadius: 20,
-    alphaDecay: 0.02
+    forceOptions: () => ({})
 })
 
 // Emits
@@ -81,10 +74,15 @@ interface Emits {
     nodeClick: [node: GraphNode, event: MouseEvent]
     nodeDoubleClick: [node: GraphNode, event: MouseEvent]
     nodeHover: [node: GraphNode | null, event: MouseEvent]
+    nodeSelect: [node: GraphNode]
+    nodeFocus: [node: GraphNode]
     linkClick: [link: GraphLink, event: MouseEvent]
     canvasClick: [event: MouseEvent]
     zoomChange: [transform: ZoomTransform]
-    simulationEnd: []
+    simulationTick: [stats: LayoutStats]
+    simulationEnd: [stats: LayoutStats]
+    copySuccess: [text: string]
+    copyError: [error: Error]
 }
 
 const emit = defineEmits<Emits>()
@@ -96,11 +94,71 @@ const containerGroupRef = ref<SVGGElement>()
 const linksGroupRef = ref<SVGGElement>()
 const nodesGroupRef = ref<SVGGElement>()
 
+// Graph interactions
+const {
+    contextMenu,
+    selectedNodeId,
+    highlightedNodes,
+    contextMenuItems,
+    handleNodeClick,
+    handleNodeDoubleClick,
+    handleNodeContextMenu,
+    handleNodeHover,
+    handleNodeFocus,
+    handleNodeBlur,
+    handleCanvasClick,
+    hideContextMenu,
+    isNodeSelected,
+    isNodeHighlighted,
+    highlightConnectedNodes,
+} = useGraphInteractions({
+    onNodeSelect: (node) => emit('nodeSelect', node),
+    onNodeDoubleClick: (node) => emit('nodeDoubleClick', node, {} as MouseEvent),
+    onCopySuccess: (text) => emit('copySuccess', text),
+    onCopyError: (error) => emit('copyError', error),
+})
+
+// Keyboard navigation
+const keyboardNav = useGraphKeyboardNavigation(
+    () => props.nodes,
+    () => selectedNodeId.value,
+    {
+        onNodeSelect: (node) => {
+            handleNodeClick(node, {} as MouseEvent)
+        },
+        onNodeFocus: (node) => {
+            handleNodeFocus(node)
+            emit('nodeFocus', node)
+        },
+        onCopy: (text) => emit('copySuccess', text),
+        onZoomToFit: () => zoomToFit(),
+        onResetZoom: () => resetZoom(),
+    }
+)
+
+// Graph search functionality
+const graphSearch = useGraphSearch({
+    caseSensitive: false,
+    matchWholeWords: false,
+    searchKeys: true,
+    searchValues: true,
+    highlightConnections: true,
+})
+
 // State
 const isLoading = ref(false)
-const simulation = ref<D3Simulation<GraphNode> | null>(null)
+const forceLayout = ref<ForceLayout | null>(null)
 const zoomBehavior = ref<D3ZoomBehavior | null>(null)
 const currentTransform = ref<ZoomTransform>(zoomIdentity)
+const layoutStats = ref<LayoutStats>({
+    iterations: 0,
+    alpha: 1,
+    isConverged: false,
+    averageVelocity: 0,
+    maxVelocity: 0,
+    frameRate: 0,
+    lastTickTime: 0,
+})
 
 // D3 selections
 let svgSelection: D3Selection | null = null
@@ -109,22 +167,11 @@ let linksGroupSelection: D3Selection | null = null
 let nodesGroupSelection: D3Selection | null = null
 
 // Computed
-const simulationNodes = computed(() => {
-    return props.nodes.map(node => ({
-        ...node,
-        // Ensure nodes have initial positions
-        x: node.x ?? props.width / 2 + (Math.random() - 0.5) * 100,
-        y: node.y ?? props.height / 2 + (Math.random() - 0.5) * 100
-    }))
-})
-
-const simulationLinks = computed(() => {
-    return props.links.map(link => ({
-        ...link,
-        source: typeof link.source === 'string' ? link.source : link.source.id,
-        target: typeof link.target === 'string' ? link.target : link.target.id
-    }))
-})
+const forceLayoutOptions = computed((): ForceLayoutOptions => ({
+    width: props.width,
+    height: props.height,
+    ...props.forceOptions
+}))
 
 // Initialize D3 selections and setup
 const initializeD3 = () => {
@@ -158,6 +205,7 @@ const setupZoomBehavior = () => {
     // Handle canvas clicks (when clicking on empty space)
     svgSelection.on('click', (event) => {
         if (event.target === svgRef.value) {
+            handleCanvasClick(event)
             emit('canvasClick', event)
         }
     })
@@ -165,27 +213,30 @@ const setupZoomBehavior = () => {
 
 // Initialize force simulation
 const initializeSimulation = () => {
-    if (simulationNodes.value.length === 0) return
+    if (props.nodes.length === 0) return
 
-    // Stop existing simulation
-    if (simulation.value) {
-        simulation.value.stop()
+    // Dispose existing layout
+    if (forceLayout.value) {
+        forceLayout.value.dispose()
     }
 
-    simulation.value = forceSimulation(simulationNodes.value as SimulationNodeDatum[])
-        .force('link', forceLink(simulationLinks.value as SimulationLinkDatum<SimulationNodeDatum>[])
-            .id((d: any) => d.id)
-            .distance(props.linkDistance)
-            .strength((d: any) => d.strength || 1)
-        )
-        .force('charge', forceManyBody().strength(props.forceStrength))
-        .force('center', forceCenter(props.width / 2, props.height / 2).strength(props.centerForce))
-        .force('collision', forceCollide().radius((d: any) => d.size + props.collisionRadius))
-        .alphaDecay(props.alphaDecay)
-        .on('tick', updatePositions)
-        .on('end', () => {
-            emit('simulationEnd')
-        })
+    // Create new force layout
+    forceLayout.value = new ForceLayout(forceLayoutOptions.value)
+
+    // Set up callbacks
+    forceLayout.value.onTick((stats) => {
+        layoutStats.value = stats
+        updatePositions()
+        emit('simulationTick', stats)
+    })
+
+    forceLayout.value.onEnd((stats) => {
+        layoutStats.value = stats
+        emit('simulationEnd', stats)
+    })
+
+    // Initialize with current data
+    forceLayout.value.initialize(props.nodes, props.links)
 }
 
 // Update node and link positions during simulation
@@ -194,14 +245,14 @@ const updatePositions = () => {
 
     // Update link positions
     linksGroupSelection.selectAll('.link')
-        .attr('x1', (d: any) => d.source.x)
-        .attr('y1', (d: any) => d.source.y)
-        .attr('x2', (d: any) => d.target.x)
-        .attr('y2', (d: any) => d.target.y)
+        .attr('x1', (d: any) => d.source.x ?? 0)
+        .attr('y1', (d: any) => d.source.y ?? 0)
+        .attr('x2', (d: any) => d.target.x ?? 0)
+        .attr('y2', (d: any) => d.target.y ?? 0)
 
     // Update node positions
     nodesGroupSelection.selectAll('.node')
-        .attr('transform', (d: any) => `translate(${d.x},${d.y})`)
+        .attr('transform', (d: any) => `translate(${d.x ?? 0},${d.y ?? 0})`)
 }
 
 // Render links
@@ -210,7 +261,7 @@ const renderLinks = () => {
 
     const linkSelection = linksGroupSelection
         .selectAll('.link')
-        .data(simulationLinks.value, (d: any) => `${d.source}-${d.target}`)
+        .data(props.links, (d: any) => `${typeof d.source === 'string' ? d.source : d.source.id}-${typeof d.target === 'string' ? d.target : d.target.id}`)
 
     // Remove old links
     linkSelection.exit().remove()
@@ -240,12 +291,33 @@ const renderLinks = () => {
         .attr('stroke-width', (d: any) => {
             const sourceId = typeof d.source === 'string' ? d.source : d.source.id
             const targetId = typeof d.target === 'string' ? d.target : d.target.id
-            return props.highlightedNodes.has(sourceId) || props.highlightedNodes.has(targetId) ? 3 : 1.5
+            return isNodeHighlighted(sourceId) || isNodeHighlighted(targetId) ? 3 : 1.5
         })
         .attr('stroke', (d: any) => {
             const sourceId = typeof d.source === 'string' ? d.source : d.source.id
             const targetId = typeof d.target === 'string' ? d.target : d.target.id
-            return props.highlightedNodes.has(sourceId) || props.highlightedNodes.has(targetId) ? '#007acc' : '#666'
+            return isNodeHighlighted(sourceId) || isNodeHighlighted(targetId) ? '#007acc' : '#666'
+        })
+        .style('opacity', (d: any) => {
+            const sourceId = typeof d.source === 'string' ? d.source : d.source.id
+            const targetId = typeof d.target === 'string' ? d.target : d.target.id
+
+            // Handle search highlighting
+            if (graphSearch.hasGraphSearchResults.value) {
+                const sourceHighlighted = graphSearch.isNodeHighlightedBySearch(sourceId)
+                const targetHighlighted = graphSearch.isNodeHighlightedBySearch(targetId)
+                if (sourceHighlighted || targetHighlighted) {
+                    return 1 // Full opacity for search-related links
+                } else {
+                    return 0.2 // Dim non-search-related links
+                }
+            }
+
+            // Handle selection highlighting
+            if (selectedNodeId.value && !isNodeHighlighted(sourceId) && !isNodeHighlighted(targetId)) {
+                return 0.3 // Dim non-connected links when a node is selected
+            }
+            return 1
         })
 }
 
@@ -255,7 +327,7 @@ const renderNodes = () => {
 
     const nodeSelection = nodesGroupSelection
         .selectAll('.node')
-        .data(simulationNodes.value, (d: any) => d.id)
+        .data(props.nodes, (d: any) => d.id)
 
     // Remove old nodes
     nodeSelection.exit().remove()
@@ -285,19 +357,41 @@ const renderNodes = () => {
 
     // Handle node interactions
     nodeEnter
+        .attr('data-node-id', (d: any) => d.id)
+        .attr('tabindex', 0)
+        .attr('role', 'button')
+        .attr('aria-label', (d: any) => `${d.type} node: ${d.key}`)
         .on('click', (event, d) => {
-            event.stopPropagation()
+            handleNodeClick(d as GraphNode, event)
             emit('nodeClick', d as GraphNode, event)
         })
         .on('dblclick', (event, d) => {
-            event.stopPropagation()
+            handleNodeDoubleClick(d as GraphNode, event)
             emit('nodeDoubleClick', d as GraphNode, event)
         })
+        .on('contextmenu', (event, d) => {
+            handleNodeContextMenu(d as GraphNode, event)
+        })
         .on('mouseenter', (event, d) => {
+            handleNodeHover(d as GraphNode)
             emit('nodeHover', d as GraphNode, event)
         })
         .on('mouseleave', (event) => {
+            handleNodeHover(null)
             emit('nodeHover', null, event)
+        })
+        .on('focus', (event, d) => {
+            handleNodeFocus(d as GraphNode)
+            emit('nodeFocus', d as GraphNode)
+        })
+        .on('blur', (event, d) => {
+            handleNodeBlur(d as GraphNode)
+        })
+        .on('keydown', (event, d) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault()
+                handleNodeClick(d as GraphNode, event as unknown as MouseEvent)
+            }
         })
 
     // Merge and update all nodes
@@ -308,28 +402,61 @@ const renderNodes = () => {
         .duration(300)
         .style('opacity', 1)
 
-    // Update node appearance based on selection and highlighting
+    // Update node appearance based on selection, highlighting, and search
     nodeUpdate.select('circle')
         .attr('fill', (d: any) => {
-            if (d.id === props.selectedNodeId) return '#ff6b35'
-            if (props.highlightedNodes.has(d.id)) return '#007acc'
+            if (isNodeSelected(d.id)) return '#ff6b35'
+            if (isNodeHighlighted(d.id)) return '#007acc'
+            if (graphSearch.isNodeHighlightedBySearch(d.id)) return '#10b981' // Green for search matches
             return getNodeColor(d.type)
         })
         .attr('stroke-width', (d: any) => {
-            return d.id === props.selectedNodeId ? 4 : 2
+            if (isNodeSelected(d.id)) return 4
+            if (isNodeHighlighted(d.id)) return 3
+            if (graphSearch.isNodeHighlightedBySearch(d.id)) return 3
+            return 2
+        })
+        .attr('stroke', (d: any) => {
+            if (isNodeSelected(d.id)) return '#333'
+            if (isNodeHighlighted(d.id)) return '#005a9e'
+            if (graphSearch.isNodeHighlightedBySearch(d.id)) return '#059669'
+            return '#fff'
         })
         .attr('r', (d: any) => {
             const baseSize = d.size
-            if (d.id === props.selectedNodeId) return baseSize * 1.2
-            if (props.highlightedNodes.has(d.id)) return baseSize * 1.1
+            if (isNodeSelected(d.id)) return baseSize * 1.2
+            if (isNodeHighlighted(d.id)) return baseSize * 1.1
+            if (graphSearch.isNodeHighlightedBySearch(d.id)) return baseSize * 1.15
             return baseSize
+        })
+        .style('opacity', (d: any) => {
+            // Dim nodes that don't match search when search is active
+            if (graphSearch.hasGraphSearchResults.value && graphSearch.isNodeDimmedBySearch(d.id)) {
+                return 0.3
+            }
+            return 1
         })
 
     nodeUpdate.select('text')
         .attr('fill', (d: any) => {
-            if (d.id === props.selectedNodeId || props.highlightedNodes.has(d.id)) return '#fff'
+            if (isNodeSelected(d.id) || isNodeHighlighted(d.id) || graphSearch.isNodeHighlightedBySearch(d.id)) return '#fff'
             return '#333'
         })
+        .style('opacity', (d: any) => {
+            // Dim text for nodes that don't match search when search is active
+            if (graphSearch.hasGraphSearchResults.value && graphSearch.isNodeDimmedBySearch(d.id)) {
+                return 0.4
+            }
+            return 1
+        })
+
+    // Add focus indicators
+    nodeUpdate
+        .style('outline', (d: any) => {
+            if (keyboardNav.focusedNodeId.value === d.id) return '2px solid #007acc'
+            return 'none'
+        })
+        .style('outline-offset', '2px')
 }
 
 // Get color for node based on type
@@ -370,7 +497,7 @@ const renderGraph = async () => {
 
 // Public methods for external control
 const zoomToFit = () => {
-    if (!svgSelection || !zoomBehavior.value || simulationNodes.value.length === 0) return
+    if (!svgSelection || !zoomBehavior.value || props.nodes.length === 0) return
 
     const bounds = getBounds()
     const fullWidth = props.width
@@ -394,7 +521,7 @@ const zoomToFit = () => {
 const zoomToNode = (nodeId: string) => {
     if (!svgSelection || !zoomBehavior.value) return
 
-    const node = simulationNodes.value.find(n => n.id === nodeId)
+    const node = props.nodes.find(n => n.id === nodeId)
     if (!node || node.x === undefined || node.y === undefined) return
 
     const scale = 2
@@ -415,9 +542,31 @@ const resetZoom = () => {
         .call(zoomBehavior.value.transform, zoomIdentity)
 }
 
+const restartSimulation = () => {
+    if (forceLayout.value) {
+        forceLayout.value.start()
+    }
+}
+
+const stopSimulation = () => {
+    if (forceLayout.value) {
+        forceLayout.value.stop()
+    }
+}
+
+const updateForceParameters = (options: Partial<ForceLayoutOptions>) => {
+    if (forceLayout.value) {
+        forceLayout.value.updateForces(options)
+    }
+}
+
+const getLayoutStats = (): LayoutStats => {
+    return layoutStats.value
+}
+
 // Get bounds of all nodes
 const getBounds = () => {
-    const nodes = simulationNodes.value.filter(n => n.x !== undefined && n.y !== undefined)
+    const nodes = props.nodes.filter(n => n.x !== undefined && n.y !== undefined)
     if (nodes.length === 0) return { x: 0, y: 0, width: 0, height: 0 }
 
     const xs = nodes.map(n => n.x!)
@@ -445,20 +594,74 @@ watch(() => [props.selectedNodeId, props.highlightedNodes], () => {
     renderLinks()
 }, { deep: true })
 
-watch(() => [props.forceStrength, props.linkDistance, props.centerForce, props.collisionRadius], () => {
-    initializeSimulation()
+watch(() => selectedNodeId.value, (newSelectedId) => {
+    if (newSelectedId) {
+        // Highlight connected nodes when a node is selected
+        highlightConnectedNodes(newSelectedId, props.links)
+    }
+    renderNodes()
+    renderLinks()
 })
+
+watch(() => highlightedNodes.value, () => {
+    renderNodes()
+    renderLinks()
+}, { deep: true })
+
+watch(() => [graphSearch.highlightedGraphNodes.value, graphSearch.dimmedGraphNodes.value], () => {
+    renderNodes()
+    renderLinks()
+}, { deep: true })
+
+watch(() => props.forceOptions, () => {
+    if (forceLayout.value) {
+        forceLayout.value.updateForces(forceLayoutOptions.value)
+    }
+}, { deep: true })
+
+watch(() => [props.width, props.height], () => {
+    if (forceLayout.value) {
+        forceLayout.value.updateDimensions(props.width, props.height)
+    }
+})
+
+// Event handlers for search integration
+const handleCenterOnNode = (event: CustomEvent) => {
+    const { nodeId, smooth = true } = event.detail
+    if (smooth) {
+        zoomToNode(nodeId)
+    } else {
+        // Immediate center without animation
+        const node = props.nodes.find(n => n.id === nodeId)
+        if (node && node.x !== undefined && node.y !== undefined) {
+            const scale = currentTransform.value.k
+            const translate = [props.width / 2 - scale * node.x, props.height / 2 - scale * node.y]
+
+            if (svgSelection && zoomBehavior.value) {
+                svgSelection.call(zoomBehavior.value.transform, zoomIdentity.translate(translate[0], translate[1]).scale(scale))
+            }
+        }
+    }
+}
 
 // Lifecycle
 onMounted(() => {
     initializeD3()
     renderGraph()
+    keyboardNav.activate()
+
+    // Listen for search-related events
+    document.addEventListener('center-on-graph-node', handleCenterOnNode as EventListener)
 })
 
 onUnmounted(() => {
-    if (simulation.value) {
-        simulation.value.stop()
+    if (forceLayout.value) {
+        forceLayout.value.dispose()
     }
+    keyboardNav.deactivate()
+
+    // Remove event listeners
+    document.removeEventListener('center-on-graph-node', handleCenterOnNode as EventListener)
 })
 
 // Expose public methods
@@ -466,6 +669,10 @@ defineExpose({
     zoomToFit,
     zoomToNode,
     resetZoom,
+    restartSimulation,
+    stopSimulation,
+    updateForceParameters,
+    getLayoutStats,
     getBounds
 })
 </script>

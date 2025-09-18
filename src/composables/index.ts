@@ -31,3 +31,15 @@ export type { LazyLoadingOptions, LazyLoadedNode } from './useLazyLoading'
 // Performance Monitor composable
 export { usePerformanceMonitor } from './usePerformanceMonitor'
 export type { PerformanceMetrics, PerformanceOptions } from './usePerformanceMonitor'
+
+// Graph Interactions composable
+export { useGraphInteractions } from './useGraphInteractions'
+export type { GraphInteractionOptions } from './useGraphInteractions'
+
+// Graph Keyboard Navigation composable
+export { useGraphKeyboardNavigation } from './useGraphKeyboardNavigation'
+export type { GraphKeyboardNavigationOptions } from './useGraphKeyboardNavigation'
+
+// Graph Search composable
+export { useGraphSearch } from './useGraphSearch'
+export type { GraphSearchOptions, GraphSearchResult } from './useGraphSearch'

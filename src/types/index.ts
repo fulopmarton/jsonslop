@@ -44,6 +44,8 @@ export interface GraphNode {
   path: string[]
   x?: number
   y?: number
+  vx?: number // Velocity x for simulation
+  vy?: number // Velocity y for simulation
   fx?: number // Fixed position for dragging
   fy?: number
   children: string[] // Node IDs of children
@@ -81,3 +83,39 @@ export interface GraphState {
 
 // View types
 export type ViewType = 'tree' | 'graph'
+
+// Force layout types (re-exported from force-layout utility)
+export interface ForceLayoutOptions {
+  // Force strengths
+  linkStrength: number
+  chargeStrength: number
+  centerStrength: number
+  collisionStrength: number
+
+  // Distance parameters
+  linkDistance: number
+  collisionRadius: number
+
+  // Simulation parameters
+  alphaDecay: number
+  alphaMin: number
+  velocityDecay: number
+
+  // Layout dimensions
+  width: number
+  height: number
+
+  // Performance settings
+  maxIterations: number
+  convergenceThreshold: number
+}
+
+export interface LayoutStats {
+  iterations: number
+  alpha: number
+  isConverged: boolean
+  averageVelocity: number
+  maxVelocity: number
+  frameRate: number
+  lastTickTime: number
+}
