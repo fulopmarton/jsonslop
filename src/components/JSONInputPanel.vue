@@ -147,6 +147,20 @@ const initializeEditor = async () => {
     if (!editorContainer.value) return
 
     try {
+        // Configure Monaco environment to disable workers
+        if (typeof window !== 'undefined') {
+            (window as any).MonacoEnvironment = {
+                getWorker: () => {
+                    return {
+                        postMessage: () => { },
+                        terminate: () => { },
+                        addEventListener: () => { },
+                        removeEventListener: () => { }
+                    }
+                }
+            }
+        }
+
         // First try to use the direct Monaco import
         if (monaco && monaco.editor && typeof monaco.editor.create === 'function') {
             monacoInstance = monaco
@@ -170,7 +184,7 @@ const initializeEditor = async () => {
         // Configure JSON language (with null check)
         if (monacoInstance.languages?.json?.jsonDefaults) {
             monacoInstance.languages.json.jsonDefaults.setDiagnosticsOptions({
-                validate: true,
+                validate: false, // Disable validation to avoid worker issues
                 allowComments: false,
                 schemas: [],
                 enableSchemaRequest: false
