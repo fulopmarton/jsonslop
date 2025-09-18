@@ -33,32 +33,8 @@
 
         <!-- Tree content area -->
         <div class="flex-1 overflow-auto">
-            <!-- Enhanced Loading state with progress -->
-            <div v-if="isProcessing" class="flex items-center justify-center h-full p-4">
-                <div class="text-center max-w-sm mx-auto">
-                    <div class="relative mb-6">
-                        <div class="animate-spin rounded-full h-12 w-12 border-4 mx-auto"
-                            style="border-color: var(--bg-tertiary); border-top-color: var(--interactive-primary);">
-                        </div>
-                        <div class="absolute inset-0 flex items-center justify-center">
-                            <div class="w-6 h-6 rounded-full opacity-20 animate-pulse"
-                                style="background-color: var(--interactive-primary);"></div>
-                        </div>
-                    </div>
-                    <p class="text-sm font-medium mb-2" style="color: var(--text-primary);">{{ processingMessage ||
-                        'Processing JSON...' }}</p>
-                    <div class="w-full rounded-full h-2 mb-2" style="background-color: var(--bg-tertiary);">
-                        <div class="h-2 rounded-full transition-all duration-300"
-                            style="background-color: var(--interactive-primary);"
-                            :style="{ width: `${processingProgress}%` }"></div>
-                    </div>
-                    <p class="text-xs" style="color: var(--text-secondary);">{{ Math.round(processingProgress) }}%
-                        complete</p>
-                </div>
-            </div>
-
             <!-- Enhanced Empty state -->
-            <div v-else-if="!hasValidJson && !hasErrors" data-testid="visualization-empty-state"
+            <div v-if="!hasValidJson && !hasErrors" data-testid="visualization-empty-state"
                 class="flex items-center justify-center h-full p-4">
                 <div class="text-center max-w-md mx-auto px-4 sm:px-6">
                     <div class="relative mb-6">
@@ -305,9 +281,6 @@ const hasErrors = computed(() => jsonStore.hasErrors)
 const validationErrors = computed(() => jsonStore.validationErrors)
 const totalNodes = computed(() => jsonStore.totalNodes)
 const expandedNodeCount = computed(() => jsonStore.expandedNodeCount)
-const isProcessing = computed(() => jsonStore.isProcessing)
-const processingMessage = computed(() => jsonStore.processingMessage)
-const processingProgress = computed(() => jsonStore.processingProgress)
 const expandedNodes = computed(() => jsonStore.treeState.expandedNodes)
 
 // Lazy loading for deeply nested structures

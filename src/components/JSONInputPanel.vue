@@ -7,15 +7,8 @@
             <div class="flex items-center gap-2 flex-shrink-0">
                 <!-- Enhanced Validation Status -->
                 <div data-testid="validation-status" class="flex items-center gap-2">
-                    <!-- Validating State -->
-                    <div v-if="validationStatus === 'validating'" class="flex items-center gap-2 status-info">
-                        <div class="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin">
-                        </div>
-                        <span class="text-xs sm:text-sm font-medium hidden sm:inline">{{ statusMessage }}</span>
-                    </div>
-
                     <!-- Valid State -->
-                    <div v-else-if="validationStatus === 'valid'" class="flex items-center gap-2 status-success">
+                    <div v-if="validationStatus === 'valid'" class="flex items-center gap-2 status-success">
                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                             <path fill-rule="evenodd"
                                 d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
@@ -68,27 +61,6 @@
         <!-- Editor Container -->
         <div class="flex-1 relative">
             <div ref="editorContainer" class="absolute inset-0"></div>
-
-            <!-- Enhanced Loading Overlay with Progress -->
-            <div v-if="isProcessing" data-testid="loading-overlay"
-                class="absolute inset-0 bg-white bg-opacity-90 flex items-center justify-center z-10">
-                <div class="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full mx-4">
-                    <div class="flex items-center gap-3 mb-4">
-                        <div class="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin">
-                        </div>
-                        <span class="text-gray-700 font-medium">{{ processingMessage || 'Processing...' }}</span>
-                    </div>
-
-                    <!-- Progress Bar -->
-                    <div class="w-full bg-gray-200 rounded-full h-2 mb-2">
-                        <div data-testid="progress-bar"
-                            class="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
-                            :style="{ width: `${processingProgress}%` }"></div>
-                    </div>
-
-                    <div class="text-xs text-gray-500 text-center">{{ Math.round(processingProgress) }}% complete</div>
-                </div>
-            </div>
         </div>
 
         <!-- Error Display -->
@@ -167,10 +139,6 @@ const {
     validationErrors,
     validationWarnings,
     validationSuggestions,
-    isValidating,
-    isProcessing,
-    processingMessage,
-    processingProgress,
     hasValidJson,
     validationStatus,
     statusMessage,
@@ -198,7 +166,7 @@ const initializeEditor = async () => {
     try {
         // Configure Monaco environment to disable workers
         if (typeof window !== 'undefined') {
-            (window as any).MonacoEnvironment = {
+            (window as unknown).MonacoEnvironment = {
                 getWorker: () => {
                     return {
                         postMessage: () => { },

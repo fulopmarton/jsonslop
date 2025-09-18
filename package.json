@@ -9,7 +9,7 @@
   },
   "packageManager": "pnpm@9.12.1",
   "scripts": {
-    "dev": "timeout 10s vite",
+    "dev": "vite",
     "build": "run-p type-check \"build-only {@}\" --",
     "preview": "vite preview",
     "test": "vitest run",

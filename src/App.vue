@@ -8,7 +8,7 @@ import { useJsonStore } from '@/stores/json'
 
 // Store integration for global error handling
 const jsonStore = useJsonStore()
-const { isProcessing, processingMessage, hasValidJson, rawJsonInput } = storeToRefs(jsonStore)
+const { hasValidJson, rawJsonInput } = storeToRefs(jsonStore)
 
 // State for managing the resizable split pane
 const isResizing = ref(false)
@@ -21,7 +21,7 @@ const showErrorDetails = ref(false)
 
 // Computed properties for UI state
 const hasContent = computed(() => rawJsonInput.value.trim().length > 0)
-const showEmptyState = computed(() => !hasContent.value && !isProcessing.value && !globalError.value)
+const showEmptyState = computed(() => false) // Always show the split panes layout so users can access the editor
 
 // Vue 3 error handling with onErrorCaptured
 onErrorCaptured((error: Error, instance, errorInfo) => {
@@ -33,11 +33,7 @@ onErrorCaptured((error: Error, instance, errorInfo) => {
   globalError.value = 'An unexpected error occurred while processing your JSON'
   errorDetails.value = `${error.message}\n\nComponent: ${instance?.$?.type?.name || 'Unknown'}\nError Info: ${errorInfo}`
 
-  // Clear processing state if error occurs during processing
-  if (isProcessing.value) {
-    // Reset processing state in store
-    jsonStore.clearProcessingState?.()
-  }
+
 
   // Return false to prevent the error from propagating further
   return false
@@ -101,16 +97,8 @@ const retryOperation = () => {
 
         <!-- Global Status Indicator -->
         <div class="flex items-center gap-2 sm:gap-3 ml-4">
-          <!-- Processing Indicator -->
-          <div v-if="isProcessing" class="flex items-center gap-2 status-info">
-            <div class="w-4 h-4 sm:w-5 sm:h-5 border-2 border-current border-t-transparent rounded-full animate-spin">
-            </div>
-            <span class="text-xs sm:text-sm font-medium hidden sm:inline">{{ processingMessage || 'Processing...'
-              }}</span>
-          </div>
-
           <!-- Success Indicator -->
-          <div v-else-if="hasValidJson && hasContent" class="flex items-center gap-2 status-success">
+          <div v-if="hasValidJson && hasContent" class="flex items-center gap-2 status-success">
             <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 20 20">
               <path fill-rule="evenodd"
                 d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
