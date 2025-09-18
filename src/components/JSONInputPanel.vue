@@ -79,7 +79,7 @@
                         </svg>
                         <div class="min-w-0 flex-1">
                             <span class="font-medium status-error">Line {{ error.line }}, Column {{ error.column
-                            }}:</span>
+                                }}:</span>
                             <span class="status-error ml-1 break-words">{{ error.message }}</span>
                         </div>
                     </div>
@@ -95,7 +95,7 @@
                         </svg>
                         <div class="min-w-0 flex-1">
                             <span class="font-medium status-warning">Line {{ warning.line }}, Column {{ warning.column
-                            }}:</span>
+                                }}:</span>
                             <span class="status-warning ml-1 break-words">{{ warning.message }}</span>
                         </div>
                     </div>
@@ -323,6 +323,7 @@ const debounceUpdateStore = (value: string) => {
     }
 
     updateTimeout = setTimeout(() => {
+        console.log('Updating JSON input:', value) // Debug log
         jsonStore.updateJsonInput(value)
     }, 300) // 300ms debounce
 }

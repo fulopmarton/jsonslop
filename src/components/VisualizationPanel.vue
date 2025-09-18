@@ -153,64 +153,13 @@
             </div>
 
             <!-- Tree visualization -->
-            <div v-else-if="jsonTree.length > 0" ref="treeContainerRef" :class="[
-                'tree-container py-2 relative',
-                { 'overflow-auto': virtualScrolling.isVirtualized.value }
-            ]" tabindex="0" @focus="keyboardNav.activate()" @blur="keyboardNav.deactivate()"
-                @scroll="virtualScrolling.handleScroll">
-
-                <!-- Virtual scrolling container -->
-                <div v-if="virtualScrolling.isVirtualized.value"
-                    :style="{ height: `${virtualScrolling.totalHeight.value}px` }" class="relative">
-
-                    <!-- Visible items container -->
-                    <div :style="{ transform: `translateY(${virtualScrolling.offsetY.value}px)` }"
-                        class="absolute top-0 left-0 right-0">
-
-                        <Suspense>
-                            <template #default>
-                                <TreeNode v-for="{ item: node, index } in virtualScrolling.visibleItems.value"
-                                    :key="`${getNodeKey(node)}-${index}`"
-                                    :ref="(ref) => setTreeNodeRef(node.path.join('.'), ref as InstanceType<typeof TreeNode>)"
-                                    :node="node" :depth="node.depth || 0"
-                                    :is-expanded="isNodeExpanded(node.path.join('.'))"
-                                    :is-selected="isNodeSelected(node.path.join('.'))"
-                                    :is-highlighted="isNodeHighlighted(node.path.join('.'))"
-                                    @toggle-expansion="handleToggleExpansion" @node-select="handleNodeSelect"
-                                    @copy-success="handleCopySuccess" />
-                            </template>
-
-                            <template #fallback>
-                                <div class="flex items-center justify-center py-8">
-                                    <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                                    <span class="ml-2 text-sm text-gray-600">Loading nodes...</span>
-                                </div>
-                            </template>
-                        </Suspense>
-                    </div>
-                </div>
-
-                <!-- Non-virtualized rendering for smaller datasets -->
-                <div v-else>
-                    <Suspense>
-                        <template #default>
-                            <TreeNode v-for="node in processedNodes" :key="getNodeKey(node)"
-                                :ref="(ref) => setTreeNodeRef(node.path.join('.'), ref as InstanceType<typeof TreeNode>)"
-                                :node="node" :depth="0" :is-expanded="isNodeExpanded(node.path.join('.'))"
-                                :is-selected="isNodeSelected(node.path.join('.'))"
-                                :is-highlighted="isNodeHighlighted(node.path.join('.'))"
-                                @toggle-expansion="handleToggleExpansion" @node-select="handleNodeSelect"
-                                @copy-success="handleCopySuccess" />
-                        </template>
-
-                        <template #fallback>
-                            <div class="flex items-center justify-center py-8">
-                                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                                <span class="ml-2 text-sm text-gray-600">Loading tree...</span>
-                            </div>
-                        </template>
-                    </Suspense>
-                </div>
+            <div v-else-if="jsonTree.length > 0" class="tree-container py-2 overflow-auto">
+                <TreeNode v-for="node in jsonTree" :key="getNodeKey(node)"
+                    :ref="(ref) => setTreeNodeRef(node.path.join('.'), ref as InstanceType<typeof TreeNode>)"
+                    :node="node" :depth="0" :is-expanded="isNodeExpanded(node.path.join('.'))"
+                    :is-selected="isNodeSelected(node.path.join('.'))"
+                    :is-highlighted="isNodeHighlighted(node.path.join('.'))" @toggle-expansion="handleToggleExpansion"
+                    @node-select="handleNodeSelect" @copy-success="handleCopySuccess" />
             </div>
         </div>
 
@@ -229,12 +178,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick, onUnmounted, watchEffect, Suspense } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { useJsonStore } from '@/stores/json'
-import { useKeyboardNavigation } from '@/composables/useKeyboardNavigation'
-import { useVirtualScrolling } from '@/composables/useVirtualScrolling'
-import { useLazyLoading } from '@/composables/useLazyLoading'
-import { usePerformanceMonitor } from '@/composables/usePerformanceMonitor'
 import TreeNode from './TreeNode.vue'
 import SearchBar from './SearchBar.vue'
 import type { JSONNode } from '@/types'
@@ -247,32 +192,6 @@ const showCopyNotification = ref(false)
 const copyNotificationMessage = ref('')
 const treeNodeRefs = ref<Record<string, InstanceType<typeof TreeNode>>>({})
 const searchBarRef = ref<InstanceType<typeof SearchBar>>()
-const treeContainerRef = ref<HTMLElement>()
-
-// Performance monitoring
-const performanceMonitor = usePerformanceMonitor({
-    enableMemoryMonitoring: true,
-    enableRenderTimeTracking: true,
-    sampleInterval: 2000
-})
-
-// Keyboard navigation
-const keyboardNav = useKeyboardNavigation({
-    onCopy: (text) => {
-        handleCopySuccess(`Copied: ${text.length > 50 ? text.substring(0, 50) + '...' : text}`)
-    },
-    onToggleExpansion: (nodePath) => {
-        // Focus is handled by the keyboard navigation composable
-    },
-    onSelectNode: async (nodePath) => {
-        // Focus the selected node
-        await nextTick()
-        const nodeRef = treeNodeRefs.value[nodePath]
-        if (nodeRef) {
-            nodeRef.focusNode()
-        }
-    },
-})
 
 // Computed properties from store
 const jsonTree = computed(() => jsonStore.jsonTree)
@@ -281,59 +200,9 @@ const hasErrors = computed(() => jsonStore.hasErrors)
 const validationErrors = computed(() => jsonStore.validationErrors)
 const totalNodes = computed(() => jsonStore.totalNodes)
 const expandedNodeCount = computed(() => jsonStore.expandedNodeCount)
-const expandedNodes = computed(() => jsonStore.treeState.expandedNodes)
 
-// Lazy loading for deeply nested structures
-const lazyLoading = useLazyLoading(jsonTree.value, expandedNodes.value, {
-    maxDepth: 4,
-    chunkSize: 100,
-    loadDelay: 50,
-    threshold: 200
-})
 
-// Processed nodes with lazy loading
-const processedNodes = computed(() => {
-    performanceMonitor.startRenderTracking()
-    const nodes = lazyLoading.processedNodes.value
-    performanceMonitor.endRenderTracking()
-    return nodes
-})
-
-// Virtual scrolling for large datasets
-const virtualScrolling = useVirtualScrolling(processedNodes.value, {
-    itemHeight: 32, // Approximate height of each tree node
-    containerHeight: 600,
-    overscan: 10,
-    threshold: 500 // Enable virtual scrolling for more than 500 nodes
-})
-
-// Flattened nodes for virtual scrolling
-const flattenedNodes = computed(() => {
-    const flatten = (nodes: any[], depth = 0): any[] => {
-        const result: any[] = []
-
-        for (const node of nodes) {
-            result.push({ ...node, depth })
-
-            if (node.isExpandable && isNodeExpanded(node.path.join('.')) && node.children) {
-                result.push(...flatten(node.children, depth + 1))
-            }
-        }
-
-        return result
-    }
-
-    return flatten(processedNodes.value)
-})
-
-// Update virtual scrolling when flattened nodes change
-watchEffect(() => {
-    const nodeCount = flattenedNodes.value.length
-    const visibleCount = virtualScrolling.visibleItems.value.length
-    performanceMonitor.updateNodeCounts(nodeCount, visibleCount)
-})
-
-// Methods
+// Methods - Define these first before computed properties that use them
 const isNodeExpanded = (nodePath: string): boolean => {
     return jsonStore.isNodeExpanded(nodePath)
 }
@@ -350,13 +219,14 @@ const getNodeKey = (node: JSONNode): string => {
     return node.path.join('.')
 }
 
+
+
 const handleToggleExpansion = (nodePath: string) => {
     jsonStore.toggleNodeExpansion(nodePath)
 }
 
 const handleNodeSelect = async (nodePath: string) => {
     jsonStore.selectNode(nodePath)
-    keyboardNav.activate()
 
     // Focus the selected node
     await nextTick()
@@ -394,21 +264,9 @@ const collapseAll = () => {
 
 const scrollToNode = async (nodePath: string) => {
     await nextTick()
-
-    if (virtualScrolling.isVirtualized.value) {
-        // Find the node index in flattened nodes
-        const nodeIndex = flattenedNodes.value.findIndex(node =>
-            node.path.join('.') === nodePath
-        )
-
-        if (nodeIndex >= 0) {
-            await virtualScrolling.scrollToItem(nodeIndex)
-        }
-    } else {
-        const nodeRef = treeNodeRefs.value[nodePath]
-        if (nodeRef) {
-            nodeRef.scrollIntoView()
-        }
+    const nodeRef = treeNodeRefs.value[nodePath]
+    if (nodeRef) {
+        nodeRef.scrollIntoView()
     }
 }
 
@@ -423,15 +281,6 @@ onMounted(() => {
 
     // Listen for scroll-to-node events from SearchBar
     document.addEventListener('scroll-to-node', handleScrollToNode as EventListener)
-
-    // Set up virtual scrolling container ref
-    if (treeContainerRef.value) {
-        virtualScrolling.containerRef.value = treeContainerRef.value
-    }
-})
-
-onUnmounted(() => {
-    document.removeEventListener('scroll-to-node', handleScrollToNode as EventListener)
 })
 </script>
 

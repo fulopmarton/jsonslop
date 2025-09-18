@@ -100,12 +100,13 @@ export const useJsonStore = defineStore('json', () => {
   })
 
   // Actions for updating JSON data
-  const updateJsonInput = async (input: string) => {
+  const updateJsonInput = (input: string) => {
     rawJsonInput.value = input
-    await validateAndParseJson(input)
+    validateAndParseJson(input)
   }
 
-  const validateAndParseJson = async (input: string) => {
+  const validateAndParseJson = (input: string) => {
+    console.log('validateAndParseJson called with:', input) // Debug log
     try {
       // Clear previous state
       validationErrors.value = []
@@ -114,6 +115,7 @@ export const useJsonStore = defineStore('json', () => {
 
       // Validate JSON
       const validationResult: ValidationResult = validationService.validate(input)
+      console.log('Validation result:', validationResult) // Debug log
 
       validationErrors.value = validationResult.errors
       validationWarnings.value = validationResult.warnings
@@ -126,9 +128,11 @@ export const useJsonStore = defineStore('json', () => {
 
         if (parseResult.isValid && parseResult.data !== undefined) {
           parsedJsonData.value = parseResult.data
+          console.log('Parsed JSON data:', parseResult.data) // Debug log
 
           // Build tree structure
           jsonTree.value = buildTree(parseResult.data)
+          console.log('Built tree:', jsonTree.value) // Debug log
 
           // Auto-expand nodes based on preferences
           autoExpandNodes()
