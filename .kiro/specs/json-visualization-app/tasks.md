@@ -8,13 +8,13 @@
   - Set up basic folder structure for components, composables, stores, and types
   - _Requirements: 4.1_
 
-- [ ] 2. Implement core data models and interfaces
+- [x] 2. Implement core data models and interfaces
   - Create TypeScript interfaces for JSONNode, ValidationError, and TreeState
   - Implement utility functions for JSON parsing and tree construction
   - Write unit tests for data model validation and tree building logic
   - _Requirements: 1.2, 2.5_
 
-- [ ] 3. Create JSON parsing and validation service
+- [-] 3. Create JSON parsing and validation service
   - Implement JSONParser composable with error handling and validation
   - Add methods for extracting line/column information from parse errors
   - Create validation service that provides real-time feedback

@@ -1,5 +1,4 @@
 // Type definitions for JSON Visualization App
-// Will be implemented in subsequent tasks
 
 export interface JSONNode {
   key: string | number
@@ -23,3 +22,15 @@ export interface TreeState {
   searchResults: string[]
   currentSearchIndex: number
 }
+
+export interface ParseResult {
+  data: unknown
+  errors: ValidationError[]
+  isValid: boolean
+}
+
+export type JSONValue = string | number | boolean | null | JSONObject | JSONArray
+export interface JSONObject {
+  [key: string]: JSONValue
+}
+export interface JSONArray extends Array<JSONValue> {}
