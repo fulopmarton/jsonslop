@@ -1,8 +1,10 @@
 // Composables for JSON Visualization App
-// Will be implemented in subsequent tasks
+
+// JSON Parser composable
+export { useJsonParser } from './useJsonParser'
+export type { UseJsonParserOptions, UseJsonParserReturn } from './useJsonParser'
 
 // Placeholder exports for future composables:
-// - useJsonParser
 // - useTreeState
 // - useSearch
 // - useClipboard

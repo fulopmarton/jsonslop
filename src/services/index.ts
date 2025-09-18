@@ -1,7 +1,8 @@
 // Services for JSON Visualization App
-// Will be implemented in subsequent tasks
+
+// Validation service
+export { ValidationService, validationService, validateJson } from './validationService'
+export type { ValidationResult, ValidationOptions } from './validationService'
 
 // Placeholder exports for future services:
-// - JSONParser service
-// - Validation service
 // - Tree construction service
