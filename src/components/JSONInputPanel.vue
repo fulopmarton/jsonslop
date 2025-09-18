@@ -1,39 +1,65 @@
 <template>
-    <div class="json-input-panel h-full flex flex-col bg-white border-r border-gray-200">
+    <div class="json-input-panel h-full flex flex-col border-r"
+        style="background-color: var(--bg-primary); border-color: var(--border-primary);">
         <!-- Header -->
-        <div class="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
-            <h2 class="text-lg font-semibold text-gray-800">JSON Input</h2>
-            <div class="flex items-center gap-2">
-                <!-- Validation Status -->
-                <div class="flex items-center gap-2">
-                    <div v-if="isValidating" class="flex items-center gap-2 text-blue-600">
-                        <div class="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin">
+        <div class="flex items-center justify-between p-3 sm:p-4 border-b panel-header">
+            <h2 class="text-base sm:text-lg font-semibold truncate" style="color: var(--text-primary);">JSON Input</h2>
+            <div class="flex items-center gap-2 flex-shrink-0">
+                <!-- Enhanced Validation Status -->
+                <div data-testid="validation-status" class="flex items-center gap-2">
+                    <!-- Validating State -->
+                    <div v-if="validationStatus === 'validating'" class="flex items-center gap-2 status-info">
+                        <div class="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin">
                         </div>
-                        <span class="text-sm">Validating...</span>
+                        <span class="text-xs sm:text-sm font-medium hidden sm:inline">{{ statusMessage }}</span>
                     </div>
-                    <div v-else-if="hasValidJson && !hasErrorsComputed" class="flex items-center gap-2 text-green-600">
+
+                    <!-- Valid State -->
+                    <div v-else-if="validationStatus === 'valid'" class="flex items-center gap-2 status-success">
                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                             <path fill-rule="evenodd"
                                 d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
                                 clip-rule="evenodd" />
                         </svg>
-                        <span class="text-sm">Valid JSON</span>
+                        <span class="text-xs sm:text-sm font-medium hidden sm:inline">{{ statusMessage }}</span>
                     </div>
-                    <div v-else-if="hasErrorsComputed" class="flex items-center gap-2 text-red-600">
+
+                    <!-- Warning State -->
+                    <div v-else-if="validationStatus === 'warning'" class="flex items-center gap-2 status-warning">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd"
+                                d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                                clip-rule="evenodd" />
+                        </svg>
+                        <span class="text-xs sm:text-sm font-medium hidden sm:inline">{{ statusMessage }}</span>
+                    </div>
+
+                    <!-- Invalid State -->
+                    <div v-else-if="validationStatus === 'invalid'" class="flex items-center gap-2 status-error">
                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                             <path fill-rule="evenodd"
                                 d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
                                 clip-rule="evenodd" />
                         </svg>
-                        <span class="text-sm">{{ validationErrors.length }} error{{ validationErrors.length !== 1 ? 's'
-                            : '' }}</span>
+                        <span class="text-xs sm:text-sm font-medium hidden sm:inline">{{ statusMessage }}</span>
+                    </div>
+
+                    <!-- Incomplete/Empty State -->
+                    <div v-else-if="validationStatus === 'incomplete' || validationStatus === 'empty'"
+                        class="flex items-center gap-2" style="color: var(--text-secondary);">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd"
+                                d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                clip-rule="evenodd" />
+                        </svg>
+                        <span class="text-xs sm:text-sm hidden sm:inline">{{ statusMessage }}</span>
                     </div>
                 </div>
 
                 <!-- Clear Button -->
                 <button @click="clearInput" :disabled="!rawJsonInput.trim()"
-                    class="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 text-gray-700 rounded border transition-colors"
-                    title="Clear input">
+                    class="btn-secondary text-xs px-2 py-1 sm:px-3 sm:py-1 hover-lift"
+                    :class="{ 'opacity-50 cursor-not-allowed': !rawJsonInput.trim() }" title="Clear input">
                     Clear
                 </button>
             </div>
@@ -43,49 +69,62 @@
         <div class="flex-1 relative">
             <div ref="editorContainer" class="absolute inset-0"></div>
 
-            <!-- Loading Overlay -->
-            <div v-if="isProcessing"
-                class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
-                <div class="flex items-center gap-3 text-gray-600">
-                    <div class="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                    <span>{{ processingMessage || 'Processing...' }}</span>
+            <!-- Enhanced Loading Overlay with Progress -->
+            <div v-if="isProcessing" data-testid="loading-overlay"
+                class="absolute inset-0 bg-white bg-opacity-90 flex items-center justify-center z-10">
+                <div class="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full mx-4">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin">
+                        </div>
+                        <span class="text-gray-700 font-medium">{{ processingMessage || 'Processing...' }}</span>
+                    </div>
+
+                    <!-- Progress Bar -->
+                    <div class="w-full bg-gray-200 rounded-full h-2 mb-2">
+                        <div data-testid="progress-bar"
+                            class="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
+                            :style="{ width: `${processingProgress}%` }"></div>
+                    </div>
+
+                    <div class="text-xs text-gray-500 text-center">{{ Math.round(processingProgress) }}% complete</div>
                 </div>
             </div>
         </div>
 
         <!-- Error Display -->
-        <div v-if="hasErrorsComputed || hasWarningsComputed"
-            class="border-t border-gray-200 bg-red-50 max-h-32 overflow-y-auto">
+        <div v-if="hasErrorsComputed || hasWarningsComputed" data-testid="error-display"
+            class="border-t max-h-32 overflow-y-auto"
+            style="border-color: var(--border-primary); background-color: var(--bg-secondary);">
             <div class="p-3">
                 <div class="space-y-2">
                     <!-- Errors -->
                     <div v-for="error in validationErrors" :key="`error-${error.line}-${error.column}`"
                         class="flex items-start gap-2 text-sm">
-                        <svg class="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <svg class="w-4 h-4 status-error mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                             <path fill-rule="evenodd"
                                 d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
                                 clip-rule="evenodd" />
                         </svg>
-                        <div>
-                            <span class="text-red-700 font-medium">Line {{ error.line }}, Column {{ error.column
-                                }}:</span>
-                            <span class="text-red-600 ml-1">{{ error.message }}</span>
+                        <div class="min-w-0 flex-1">
+                            <span class="font-medium status-error">Line {{ error.line }}, Column {{ error.column
+                            }}:</span>
+                            <span class="status-error ml-1 break-words">{{ error.message }}</span>
                         </div>
                     </div>
 
                     <!-- Warnings -->
                     <div v-for="warning in validationWarnings" :key="`warning-${warning.line}-${warning.column}`"
                         class="flex items-start gap-2 text-sm">
-                        <svg class="w-4 h-4 text-yellow-500 mt-0.5 flex-shrink-0" fill="currentColor"
+                        <svg class="w-4 h-4 status-warning mt-0.5 flex-shrink-0" fill="currentColor"
                             viewBox="0 0 20 20">
                             <path fill-rule="evenodd"
                                 d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
                                 clip-rule="evenodd" />
                         </svg>
-                        <div>
-                            <span class="text-yellow-700 font-medium">Line {{ warning.line }}, Column {{ warning.column
-                                }}:</span>
-                            <span class="text-yellow-600 ml-1">{{ warning.message }}</span>
+                        <div class="min-w-0 flex-1">
+                            <span class="font-medium status-warning">Line {{ warning.line }}, Column {{ warning.column
+                            }}:</span>
+                            <span class="status-warning ml-1 break-words">{{ warning.message }}</span>
                         </div>
                     </div>
                 </div>
@@ -93,13 +132,20 @@
         </div>
 
         <!-- Suggestions -->
-        <div v-if="validationSuggestions.length > 0"
-            class="border-t border-gray-200 bg-blue-50 max-h-24 overflow-y-auto">
+        <div v-if="validationSuggestions.length > 0" data-testid="suggestions-display"
+            class="border-t max-h-24 overflow-y-auto"
+            style="border-color: var(--border-primary); background-color: var(--bg-accent);">
             <div class="p-3">
-                <div class="text-sm text-blue-700 font-medium mb-1">Suggestions:</div>
+                <div class="text-sm font-medium mb-1 status-info">Suggestions:</div>
                 <ul class="space-y-1">
-                    <li v-for="(suggestion, index) in validationSuggestions" :key="index" class="text-sm text-blue-600">
-                        • {{ suggestion }}
+                    <li v-for="(suggestion, index) in validationSuggestions" :key="index"
+                        class="text-sm flex items-start gap-2 status-info">
+                        <svg class="w-3 h-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd"
+                                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                clip-rule="evenodd" />
+                        </svg>
+                        <span>{{ suggestion }}</span>
                     </li>
                 </ul>
             </div>
@@ -124,8 +170,11 @@ const {
     isValidating,
     isProcessing,
     processingMessage,
+    processingProgress,
     hasValidJson,
-
+    validationStatus,
+    statusMessage,
+    statusColor,
     uiPreferences
 } = storeToRefs(jsonStore)
 
@@ -272,7 +321,7 @@ const createFallbackEditor = () => {
         deltaDecorations: () => [],
         updateOptions: () => { },
         getAction: () => ({ run: () => { } })
-    } as any
+    } as unknown
 
     isEditorReady.value = true
 }

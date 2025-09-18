@@ -1,94 +1,266 @@
 <template>
     <div class="visualization-panel h-full flex flex-col">
+        <!-- Search bar -->
+        <SearchBar v-if="hasValidJson" ref="searchBarRef" />
+
         <!-- Header with controls -->
-        <div class="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
-            <div class="flex items-center space-x-4">
-                <h3 class="text-sm font-medium text-gray-700">
+        <div class="flex items-center justify-between p-3 sm:p-4 border-b"
+            style="border-color: var(--border-primary); background-color: var(--bg-secondary);">
+            <div class="flex items-center space-x-2 sm:space-x-4 min-w-0 flex-1">
+                <h3 class="text-xs sm:text-sm font-medium truncate" style="color: var(--text-primary);">
                     {{ totalNodes }} nodes
-                    <span v-if="expandedNodeCount > 0" class="text-gray-500">
+                    <span v-if="expandedNodeCount > 0" class="hidden sm:inline" style="color: var(--text-secondary);">
                         ({{ expandedNodeCount }} expanded)
                     </span>
                 </h3>
             </div>
 
-            <div class="flex items-center space-x-2">
+            <div class="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
                 <!-- Expand/Collapse All buttons -->
-                <button @click="expandAll"
-                    class="px-3 py-1 text-xs font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors duration-200"
-                    :disabled="!hasValidJson">
-                    Expand All
+                <button @click="expandAll" class="btn-secondary text-xs px-2 py-1 sm:px-3 sm:py-1 hover-lift"
+                    :disabled="!hasValidJson" :class="{ 'opacity-50 cursor-not-allowed': !hasValidJson }"
+                    style="color: var(--interactive-primary);">
+                    <span class="hidden sm:inline">Expand All</span>
+                    <span class="sm:hidden">Expand</span>
                 </button>
-                <button @click="collapseAll"
-                    class="px-3 py-1 text-xs font-medium text-gray-600 hover:text-gray-700 hover:bg-gray-50 rounded transition-colors duration-200"
-                    :disabled="!hasValidJson">
-                    Collapse All
+                <button @click="collapseAll" class="btn-secondary text-xs px-2 py-1 sm:px-3 sm:py-1 hover-lift"
+                    :disabled="!hasValidJson" :class="{ 'opacity-50 cursor-not-allowed': !hasValidJson }">
+                    <span class="hidden sm:inline">Collapse All</span>
+                    <span class="sm:hidden">Collapse</span>
                 </button>
             </div>
         </div>
 
         <!-- Tree content area -->
         <div class="flex-1 overflow-auto">
-            <!-- Loading state -->
-            <div v-if="isProcessing" class="flex items-center justify-center h-full">
-                <div class="text-center">
-                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                    <p class="text-sm text-gray-600">{{ processingMessage || 'Processing JSON...' }}</p>
+            <!-- Enhanced Loading state with progress -->
+            <div v-if="isProcessing" class="flex items-center justify-center h-full p-4">
+                <div class="text-center max-w-sm mx-auto">
+                    <div class="relative mb-6">
+                        <div class="animate-spin rounded-full h-12 w-12 border-4 mx-auto"
+                            style="border-color: var(--bg-tertiary); border-top-color: var(--interactive-primary);">
+                        </div>
+                        <div class="absolute inset-0 flex items-center justify-center">
+                            <div class="w-6 h-6 rounded-full opacity-20 animate-pulse"
+                                style="background-color: var(--interactive-primary);"></div>
+                        </div>
+                    </div>
+                    <p class="text-sm font-medium mb-2" style="color: var(--text-primary);">{{ processingMessage ||
+                        'Processing JSON...' }}</p>
+                    <div class="w-full rounded-full h-2 mb-2" style="background-color: var(--bg-tertiary);">
+                        <div class="h-2 rounded-full transition-all duration-300"
+                            style="background-color: var(--interactive-primary);"
+                            :style="{ width: `${processingProgress}%` }"></div>
+                    </div>
+                    <p class="text-xs" style="color: var(--text-secondary);">{{ Math.round(processingProgress) }}%
+                        complete</p>
                 </div>
             </div>
 
-            <!-- Empty state -->
-            <div v-else-if="!hasValidJson" class="flex items-center justify-center h-full">
-                <div class="text-center text-gray-500">
-                    <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24"
-                        stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    <p class="text-sm font-medium mb-2">No JSON to visualize</p>
-                    <p class="text-xs text-gray-400">Enter valid JSON in the input panel to see the tree structure</p>
+            <!-- Enhanced Empty state -->
+            <div v-else-if="!hasValidJson && !hasErrors" data-testid="visualization-empty-state"
+                class="flex items-center justify-center h-full p-4">
+                <div class="text-center max-w-md mx-auto px-4 sm:px-6">
+                    <div class="relative mb-6">
+                        <svg class="mx-auto h-16 w-16" style="color: var(--text-tertiary);" fill="none"
+                            viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <div class="absolute -top-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center"
+                            style="background-color: var(--bg-accent);">
+                            <svg class="w-3 h-3 status-info" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd"
+                                    d="M3 4a1 1 0 011-1h4a1 1 0 010 2H6.414l2.293 2.293a1 1 0 01-1.414 1.414L5 6.414V8a1 1 0 01-2 0V4zm9 1a1 1 0 010-2h4a1 1 0 011 1v4a1 1 0 01-2 0V6.414l-2.293 2.293a1 1 0 11-1.414-1.414L13.586 5H12z"
+                                    clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                    </div>
+                    <h3 class="text-base sm:text-lg font-medium mb-3" style="color: var(--text-primary);">Ready to
+                        visualize</h3>
+                    <p class="text-sm mb-4" style="color: var(--text-secondary);">Enter valid JSON in the left panel to
+                        see an interactive tree visualization here.</p>
+                    <div class="text-xs space-y-1" style="color: var(--text-secondary);">
+                        <div class="flex items-center justify-center gap-2">
+                            <svg class="w-3 h-3 status-success" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd"
+                                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                    clip-rule="evenodd" />
+                            </svg>
+                            <span>Expand and collapse nodes</span>
+                        </div>
+                        <div class="flex items-center justify-center gap-2">
+                            <svg class="w-3 h-3 status-success" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd"
+                                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                    clip-rule="evenodd" />
+                            </svg>
+                            <span>Search through your data</span>
+                        </div>
+                        <div class="flex items-center justify-center gap-2">
+                            <svg class="w-3 h-3 status-success" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd"
+                                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                    clip-rule="evenodd" />
+                            </svg>
+                            <span>Copy values and paths</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <!-- Error state -->
-            <div v-else-if="hasErrors" class="flex items-center justify-center h-full">
-                <div class="text-center text-red-500">
-                    <svg class="mx-auto h-12 w-12 text-red-400 mb-4" fill="none" viewBox="0 0 24 24"
-                        stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                    </svg>
-                    <p class="text-sm font-medium mb-2">JSON contains errors</p>
-                    <p class="text-xs text-gray-400">Fix the JSON syntax errors to view the visualization</p>
+            <!-- Enhanced Error state with actionable feedback -->
+            <div v-else-if="hasErrors" data-testid="visualization-error-state"
+                class="flex items-center justify-center h-full p-4">
+                <div class="text-center max-w-md mx-auto px-4 sm:px-6">
+                    <div class="relative mb-6">
+                        <svg class="mx-auto h-16 w-16 status-error" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                        </svg>
+                        <div class="absolute -top-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center"
+                            style="background-color: var(--bg-primary); border: 2px solid var(--status-error);">
+                            <span class="text-xs font-bold status-error">{{ validationErrors.length }}</span>
+                        </div>
+                    </div>
+                    <h3 class="text-base sm:text-lg font-medium mb-2 status-error">JSON Validation Failed</h3>
+                    <p class="text-sm mb-4 status-error">
+                        Found {{ validationErrors.length }} error{{ validationErrors.length !== 1 ? 's' : '' }} in your
+                        JSON.
+                        Fix {{ validationErrors.length === 1 ? 'it' : 'them' }} to see the visualization.
+                    </p>
+
+                    <!-- Error summary -->
+                    <div class="rounded-lg p-4 mb-4 text-left"
+                        style="background-color: var(--bg-secondary); border: 1px solid var(--border-primary);">
+                        <h4 class="text-sm font-medium mb-2" style="color: var(--text-primary);">Common Issues:</h4>
+                        <ul class="text-xs space-y-1" style="color: var(--text-secondary);">
+                            <li class="flex items-center gap-2">
+                                <svg class="w-3 h-3 status-error flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd"
+                                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                                        clip-rule="evenodd" />
+                                </svg>
+                                <span>Missing commas between elements</span>
+                            </li>
+                            <li class="flex items-center gap-2">
+                                <svg class="w-3 h-3 status-error flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd"
+                                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                                        clip-rule="evenodd" />
+                                </svg>
+                                <span>Unclosed brackets or braces</span>
+                            </li>
+                            <li class="flex items-center gap-2">
+                                <svg class="w-3 h-3 status-error flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd"
+                                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                                        clip-rule="evenodd" />
+                                </svg>
+                                <span>Unquoted property names</span>
+                            </li>
+                            <li class="flex items-center gap-2">
+                                <svg class="w-3 h-3 status-error flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd"
+                                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                                        clip-rule="evenodd" />
+                                </svg>
+                                <span>Trailing commas</span>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <p class="text-xs" style="color: var(--text-secondary);">Check the input panel for detailed error
+                        locations and suggestions.</p>
                 </div>
             </div>
 
             <!-- Tree visualization -->
-            <div v-else-if="jsonTree.length > 0" class="tree-container py-2">
-                <TreeNode v-for="node in jsonTree" :key="getNodeKey(node)" :node="node" :depth="0"
-                    :is-expanded="isNodeExpanded(node.path.join('.'))"
-                    :is-selected="isNodeSelected(node.path.join('.'))"
-                    :is-highlighted="isNodeHighlighted(node.path.join('.'))" @toggle-expansion="handleToggleExpansion"
-                    @node-select="handleNodeSelect" @copy-success="handleCopySuccess" />
+            <div v-else-if="jsonTree.length > 0" ref="treeContainerRef" :class="[
+                'tree-container py-2 relative',
+                { 'overflow-auto': virtualScrolling.isVirtualized.value }
+            ]" tabindex="0" @focus="keyboardNav.activate()" @blur="keyboardNav.deactivate()"
+                @scroll="virtualScrolling.handleScroll">
+
+                <!-- Virtual scrolling container -->
+                <div v-if="virtualScrolling.isVirtualized.value"
+                    :style="{ height: `${virtualScrolling.totalHeight.value}px` }" class="relative">
+
+                    <!-- Visible items container -->
+                    <div :style="{ transform: `translateY(${virtualScrolling.offsetY.value}px)` }"
+                        class="absolute top-0 left-0 right-0">
+
+                        <Suspense>
+                            <template #default>
+                                <TreeNode v-for="{ item: node, index } in virtualScrolling.visibleItems.value"
+                                    :key="`${getNodeKey(node)}-${index}`"
+                                    :ref="(ref) => setTreeNodeRef(node.path.join('.'), ref as InstanceType<typeof TreeNode>)"
+                                    :node="node" :depth="node.depth || 0"
+                                    :is-expanded="isNodeExpanded(node.path.join('.'))"
+                                    :is-selected="isNodeSelected(node.path.join('.'))"
+                                    :is-highlighted="isNodeHighlighted(node.path.join('.'))"
+                                    @toggle-expansion="handleToggleExpansion" @node-select="handleNodeSelect"
+                                    @copy-success="handleCopySuccess" />
+                            </template>
+
+                            <template #fallback>
+                                <div class="flex items-center justify-center py-8">
+                                    <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                                    <span class="ml-2 text-sm text-gray-600">Loading nodes...</span>
+                                </div>
+                            </template>
+                        </Suspense>
+                    </div>
+                </div>
+
+                <!-- Non-virtualized rendering for smaller datasets -->
+                <div v-else>
+                    <Suspense>
+                        <template #default>
+                            <TreeNode v-for="node in processedNodes" :key="getNodeKey(node)"
+                                :ref="(ref) => setTreeNodeRef(node.path.join('.'), ref as InstanceType<typeof TreeNode>)"
+                                :node="node" :depth="0" :is-expanded="isNodeExpanded(node.path.join('.'))"
+                                :is-selected="isNodeSelected(node.path.join('.'))"
+                                :is-highlighted="isNodeHighlighted(node.path.join('.'))"
+                                @toggle-expansion="handleToggleExpansion" @node-select="handleNodeSelect"
+                                @copy-success="handleCopySuccess" />
+                        </template>
+
+                        <template #fallback>
+                            <div class="flex items-center justify-center py-8">
+                                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                                <span class="ml-2 text-sm text-gray-600">Loading tree...</span>
+                            </div>
+                        </template>
+                    </Suspense>
+                </div>
             </div>
         </div>
 
         <!-- Copy success notification -->
         <div v-if="showCopyNotification"
-            class="fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg transition-all duration-300 z-50">
+            class="fixed bottom-4 right-4 px-4 py-3 rounded-lg shadow-lg transition-all duration-300 z-50 hover-lift"
+            style="background-color: var(--status-success); color: white;">
             <div class="flex items-center space-x-2">
-                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg class="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                 </svg>
-                <span class="text-sm">{{ copyNotificationMessage }}</span>
+                <span class="text-sm font-medium">{{ copyNotificationMessage }}</span>
             </div>
         </div>
     </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick, onUnmounted, watchEffect, Suspense } from 'vue'
 import { useJsonStore } from '@/stores/json'
+import { useKeyboardNavigation } from '@/composables/useKeyboardNavigation'
+import { useVirtualScrolling } from '@/composables/useVirtualScrolling'
+import { useLazyLoading } from '@/composables/useLazyLoading'
+import { usePerformanceMonitor } from '@/composables/usePerformanceMonitor'
 import TreeNode from './TreeNode.vue'
+import SearchBar from './SearchBar.vue'
 import type { JSONNode } from '@/types'
 
 // Store
@@ -97,15 +269,96 @@ const jsonStore = useJsonStore()
 // Local state
 const showCopyNotification = ref(false)
 const copyNotificationMessage = ref('')
+const treeNodeRefs = ref<Record<string, InstanceType<typeof TreeNode>>>({})
+const searchBarRef = ref<InstanceType<typeof SearchBar>>()
+const treeContainerRef = ref<HTMLElement>()
+
+// Performance monitoring
+const performanceMonitor = usePerformanceMonitor({
+    enableMemoryMonitoring: true,
+    enableRenderTimeTracking: true,
+    sampleInterval: 2000
+})
+
+// Keyboard navigation
+const keyboardNav = useKeyboardNavigation({
+    onCopy: (text) => {
+        handleCopySuccess(`Copied: ${text.length > 50 ? text.substring(0, 50) + '...' : text}`)
+    },
+    onToggleExpansion: (nodePath) => {
+        // Focus is handled by the keyboard navigation composable
+    },
+    onSelectNode: async (nodePath) => {
+        // Focus the selected node
+        await nextTick()
+        const nodeRef = treeNodeRefs.value[nodePath]
+        if (nodeRef) {
+            nodeRef.focusNode()
+        }
+    },
+})
 
 // Computed properties from store
 const jsonTree = computed(() => jsonStore.jsonTree)
 const hasValidJson = computed(() => jsonStore.hasValidJson)
 const hasErrors = computed(() => jsonStore.hasErrors)
+const validationErrors = computed(() => jsonStore.validationErrors)
 const totalNodes = computed(() => jsonStore.totalNodes)
 const expandedNodeCount = computed(() => jsonStore.expandedNodeCount)
 const isProcessing = computed(() => jsonStore.isProcessing)
 const processingMessage = computed(() => jsonStore.processingMessage)
+const processingProgress = computed(() => jsonStore.processingProgress)
+const expandedNodes = computed(() => jsonStore.treeState.expandedNodes)
+
+// Lazy loading for deeply nested structures
+const lazyLoading = useLazyLoading(jsonTree.value, expandedNodes.value, {
+    maxDepth: 4,
+    chunkSize: 100,
+    loadDelay: 50,
+    threshold: 200
+})
+
+// Processed nodes with lazy loading
+const processedNodes = computed(() => {
+    performanceMonitor.startRenderTracking()
+    const nodes = lazyLoading.processedNodes.value
+    performanceMonitor.endRenderTracking()
+    return nodes
+})
+
+// Virtual scrolling for large datasets
+const virtualScrolling = useVirtualScrolling(processedNodes.value, {
+    itemHeight: 32, // Approximate height of each tree node
+    containerHeight: 600,
+    overscan: 10,
+    threshold: 500 // Enable virtual scrolling for more than 500 nodes
+})
+
+// Flattened nodes for virtual scrolling
+const flattenedNodes = computed(() => {
+    const flatten = (nodes: any[], depth = 0): any[] => {
+        const result: any[] = []
+
+        for (const node of nodes) {
+            result.push({ ...node, depth })
+
+            if (node.isExpandable && isNodeExpanded(node.path.join('.')) && node.children) {
+                result.push(...flatten(node.children, depth + 1))
+            }
+        }
+
+        return result
+    }
+
+    return flatten(processedNodes.value)
+})
+
+// Update virtual scrolling when flattened nodes change
+watchEffect(() => {
+    const nodeCount = flattenedNodes.value.length
+    const visibleCount = virtualScrolling.visibleItems.value.length
+    performanceMonitor.updateNodeCounts(nodeCount, visibleCount)
+})
 
 // Methods
 const isNodeExpanded = (nodePath: string): boolean => {
@@ -128,8 +381,24 @@ const handleToggleExpansion = (nodePath: string) => {
     jsonStore.toggleNodeExpansion(nodePath)
 }
 
-const handleNodeSelect = (nodePath: string) => {
+const handleNodeSelect = async (nodePath: string) => {
     jsonStore.selectNode(nodePath)
+    keyboardNav.activate()
+
+    // Focus the selected node
+    await nextTick()
+    const nodeRef = treeNodeRefs.value[nodePath]
+    if (nodeRef) {
+        nodeRef.focusNode()
+    }
+}
+
+const setTreeNodeRef = (nodePath: string, ref: InstanceType<typeof TreeNode> | null) => {
+    if (ref) {
+        treeNodeRefs.value[nodePath] = ref
+    } else {
+        delete treeNodeRefs.value[nodePath]
+    }
 }
 
 const handleCopySuccess = (message: string) => {
@@ -150,9 +419,46 @@ const collapseAll = () => {
     jsonStore.collapseAllNodes()
 }
 
+const scrollToNode = async (nodePath: string) => {
+    await nextTick()
+
+    if (virtualScrolling.isVirtualized.value) {
+        // Find the node index in flattened nodes
+        const nodeIndex = flattenedNodes.value.findIndex(node =>
+            node.path.join('.') === nodePath
+        )
+
+        if (nodeIndex >= 0) {
+            await virtualScrolling.scrollToItem(nodeIndex)
+        }
+    } else {
+        const nodeRef = treeNodeRefs.value[nodePath]
+        if (nodeRef) {
+            nodeRef.scrollIntoView()
+        }
+    }
+}
+
+const handleScrollToNode = (event: CustomEvent) => {
+    const { nodePath } = event.detail
+    scrollToNode(nodePath)
+}
+
 // Initialize store on mount
 onMounted(() => {
     jsonStore.initializeStore()
+
+    // Listen for scroll-to-node events from SearchBar
+    document.addEventListener('scroll-to-node', handleScrollToNode as EventListener)
+
+    // Set up virtual scrolling container ref
+    if (treeContainerRef.value) {
+        virtualScrolling.containerRef.value = treeContainerRef.value
+    }
+})
+
+onUnmounted(() => {
+    document.removeEventListener('scroll-to-node', handleScrollToNode as EventListener)
 })
 </script>
 

@@ -52,6 +52,17 @@ export const useJsonStore = defineStore('json', () => {
   // Loading states
   const isProcessing = ref<boolean>(false)
   const processingMessage = ref<string>('')
+  const processingProgress = ref<number>(0) // 0-100 for progress indication
+
+  // Validation status
+  const validationStatus = computed(() => {
+    if (isValidating.value) return 'validating'
+    if (hasErrors.value) return 'invalid'
+    if (hasWarnings.value) return 'warning'
+    if (hasValidJson.value) return 'valid'
+    if (rawJsonInput.value.trim()) return 'incomplete'
+    return 'empty'
+  })
 
   // Computed properties
   const hasValidJson = computed(() => isValidJson.value && parsedJsonData.value !== null)
@@ -59,6 +70,45 @@ export const useJsonStore = defineStore('json', () => {
   const hasWarnings = computed(() => validationWarnings.value.length > 0)
   const totalNodes = computed(() => countNodes(jsonTree.value))
   const expandedNodeCount = computed(() => treeState.value.expandedNodes.size)
+
+  // Enhanced status indicators
+  const statusMessage = computed(() => {
+    switch (validationStatus.value) {
+      case 'validating':
+        return 'Validating JSON...'
+      case 'invalid':
+        return `${validationErrors.value.length} error${validationErrors.value.length !== 1 ? 's' : ''} found`
+      case 'warning':
+        return `Valid JSON with ${validationWarnings.value.length} warning${validationWarnings.value.length !== 1 ? 's' : ''}`
+      case 'valid':
+        return `Valid JSON (${totalNodes.value} nodes)`
+      case 'incomplete':
+        return 'JSON appears incomplete'
+      case 'empty':
+        return 'Enter JSON to begin'
+      default:
+        return ''
+    }
+  })
+
+  const statusColor = computed(() => {
+    switch (validationStatus.value) {
+      case 'validating':
+        return 'blue'
+      case 'invalid':
+        return 'red'
+      case 'warning':
+        return 'yellow'
+      case 'valid':
+        return 'green'
+      case 'incomplete':
+        return 'gray'
+      case 'empty':
+        return 'gray'
+      default:
+        return 'gray'
+    }
+  })
 
   // Actions for updating JSON data
   const updateJsonInput = async (input: string) => {
@@ -69,6 +119,7 @@ export const useJsonStore = defineStore('json', () => {
   const validateAndParseJson = async (input: string) => {
     isValidating.value = true
     isProcessing.value = true
+    processingProgress.value = 0
     processingMessage.value = 'Validating JSON...'
 
     try {
@@ -76,9 +127,11 @@ export const useJsonStore = defineStore('json', () => {
       validationErrors.value = []
       validationWarnings.value = []
       validationSuggestions.value = []
+      processingProgress.value = 10
 
       // Validate JSON
       const validationResult: ValidationResult = validationService.validate(input)
+      processingProgress.value = 30
 
       validationErrors.value = validationResult.errors
       validationWarnings.value = validationResult.warnings
@@ -88,20 +141,26 @@ export const useJsonStore = defineStore('json', () => {
       if (validationResult.isValid) {
         // Parse JSON data
         processingMessage.value = 'Parsing JSON data...'
+        processingProgress.value = 50
+
         const parseResult: ParseResult = parseJSON(input)
 
         if (parseResult.isValid && parseResult.data !== undefined) {
           parsedJsonData.value = parseResult.data
+          processingProgress.value = 70
 
           // Build tree structure
           processingMessage.value = 'Building tree structure...'
           jsonTree.value = buildTree(parseResult.data)
+          processingProgress.value = 90
 
           // Auto-expand nodes based on preferences
+          processingMessage.value = 'Finalizing visualization...'
           autoExpandNodes()
 
           // Clear search when new data is loaded
           clearSearch()
+          processingProgress.value = 100
         } else {
           // Handle parsing errors
           parsedJsonData.value = null
@@ -113,6 +172,7 @@ export const useJsonStore = defineStore('json', () => {
         // Invalid JSON
         parsedJsonData.value = null
         jsonTree.value = []
+        processingProgress.value = 100
       }
     } catch (error) {
       // Handle unexpected errors
@@ -128,10 +188,15 @@ export const useJsonStore = defineStore('json', () => {
       isValidJson.value = false
       parsedJsonData.value = null
       jsonTree.value = []
+      processingProgress.value = 100
     } finally {
-      isValidating.value = false
-      isProcessing.value = false
-      processingMessage.value = ''
+      // Small delay to show completion
+      setTimeout(() => {
+        isValidating.value = false
+        isProcessing.value = false
+        processingMessage.value = ''
+        processingProgress.value = 0
+      }, 200)
     }
   }
 
@@ -315,6 +380,13 @@ export const useJsonStore = defineStore('json', () => {
   }
 
   // Initialize store
+  const clearProcessingState = () => {
+    isProcessing.value = false
+    isValidating.value = false
+    processingMessage.value = ''
+    processingProgress.value = 0
+  }
+
   const initializeStore = () => {
     loadPreferencesFromStorage()
     loadTreeStateFromStorage()
@@ -449,6 +521,7 @@ export const useJsonStore = defineStore('json', () => {
     uiPreferences,
     isProcessing,
     processingMessage,
+    processingProgress,
 
     // Computed
     hasValidJson,
@@ -459,6 +532,9 @@ export const useJsonStore = defineStore('json', () => {
     searchResults,
     currentSearchIndex,
     hasSearchResults,
+    validationStatus,
+    statusMessage,
+    statusColor,
 
     // Actions
     updateJsonInput,
@@ -482,6 +558,7 @@ export const useJsonStore = defineStore('json', () => {
     isNodeExpanded,
     isNodeSelected,
     isNodeInSearchResults,
+    clearProcessingState,
     initializeStore,
   }
 })

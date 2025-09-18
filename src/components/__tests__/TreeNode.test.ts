@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import TreeNode from '../TreeNode.vue'
+import ContextMenu from '../ContextMenu.vue'
 import type { JSONNode } from '@/types'
 
 // Mock clipboard API
@@ -33,11 +34,14 @@ describe('TreeNode', () => {
     ...overrides,
   })
 
-  const mountTreeNode = (props: unknown) => {
+  const mountTreeNode = (props: any = {}) => {
     return mount(TreeNode, {
-      ...props,
+      props: props.props || {},
       global: {
         plugins: [pinia],
+        components: {
+          ContextMenu,
+        },
         ...(props.global || {}),
       },
     })
@@ -447,6 +451,255 @@ describe('TreeNode', () => {
     })
   })
 
+  describe('Context Menu', () => {
+    it('shows context menu on right click', async () => {
+      const node = createMockNode()
+      const wrapper = mountTreeNode({
+        props: { node },
+      })
+
+      await wrapper.find('.tree-node').trigger('contextmenu')
+
+      expect(wrapper.findComponent(ContextMenu).props('isVisible')).toBe(true)
+    })
+
+    it('shows context menu button on hover', async () => {
+      const node = createMockNode()
+      const wrapper = mountTreeNode({
+        props: { node },
+      })
+
+      // Initially hidden
+      expect(wrapper.find('.context-menu-button').exists()).toBe(false)
+
+      // Show on hover
+      await wrapper.find('.tree-node').trigger('mouseenter')
+      expect(wrapper.find('.context-menu-button').exists()).toBe(true)
+    })
+
+    it('opens context menu when context menu button is clicked', async () => {
+      const node = createMockNode()
+      const wrapper = mountTreeNode({
+        props: { node },
+      })
+
+      await wrapper.find('.tree-node').trigger('mouseenter')
+      await wrapper.find('.context-menu-button').trigger('click')
+
+      expect(wrapper.findComponent(ContextMenu).props('isVisible')).toBe(true)
+    })
+
+    it('provides correct context menu items for expandable nodes', async () => {
+      const node = createMockNode({
+        type: 'object',
+        isExpandable: true,
+        value: { test: 'value' },
+      })
+
+      const wrapper = mountTreeNode({
+        props: { node },
+      })
+
+      await wrapper.find('.tree-node').trigger('contextmenu')
+
+      const contextMenu = wrapper.findComponent(ContextMenu)
+      const items = contextMenu.props('items')
+
+      expect(items).toHaveLength(4)
+      expect(items[0].label).toBe('Copy Key')
+      expect(items[1].label).toBe('Copy Subtree')
+      expect(items[2].label).toBe('Copy Path')
+      expect(items[3].label).toBe('Expand')
+    })
+
+    it('provides correct context menu items for non-expandable nodes', async () => {
+      const node = createMockNode({
+        type: 'string',
+        isExpandable: false,
+        value: 'test value',
+      })
+
+      const wrapper = mountTreeNode({
+        props: { node },
+      })
+
+      await wrapper.find('.tree-node').trigger('contextmenu')
+
+      const contextMenu = wrapper.findComponent(ContextMenu)
+      const items = contextMenu.props('items')
+
+      expect(items).toHaveLength(4)
+      expect(items[1].label).toBe('Copy Value')
+      expect(items[3].disabled).toBe(true)
+    })
+  })
+
+  describe('Enhanced Copy Functionality', () => {
+    it('copies key when key is clicked', async () => {
+      const node = createMockNode({
+        key: 'testKey',
+      })
+
+      const wrapper = mountTreeNode({
+        props: { node },
+      })
+
+      await wrapper.find('.node-key').trigger('click')
+
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('testKey')
+    })
+
+    it('copies value when value is clicked', async () => {
+      const node = createMockNode({
+        value: 'test value',
+        type: 'string',
+      })
+
+      const wrapper = mountTreeNode({
+        props: { node },
+      })
+
+      await wrapper.find('.node-value').trigger('click')
+
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('"test value"')
+    })
+
+    it('copies path when copy path action is triggered', async () => {
+      const node = createMockNode({
+        path: ['root', 'user', 'name'],
+      })
+
+      const wrapper = mountTreeNode({
+        props: { node },
+      })
+
+      // Access the component instance to call copyPath directly
+      await (wrapper.vm as any).copyPath()
+
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('root.user.name')
+    })
+
+    it('copies entire subtree for expandable nodes', async () => {
+      const node = createMockNode({
+        key: 'user',
+        value: { name: 'John', age: 25 },
+        type: 'object',
+        isExpandable: true,
+      })
+
+      const wrapper = mountTreeNode({
+        props: { node },
+      })
+
+      await wrapper.find('.tree-node').trigger('mouseenter')
+      await wrapper.find('.copy-button').trigger('click')
+
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+        JSON.stringify({ name: 'John', age: 25 }, null, 2),
+      )
+    })
+  })
+
+  describe('Keyboard Navigation', () => {
+    it('handles Enter key to toggle expansion', async () => {
+      const node = createMockNode({
+        type: 'object',
+        isExpandable: true,
+      })
+
+      const wrapper = mountTreeNode({
+        props: { node },
+      })
+
+      await wrapper.find('.tree-node').trigger('keydown', { key: 'Enter' })
+
+      expect(wrapper.emitted('toggle-expansion')).toBeTruthy()
+    })
+
+    it('handles Space key to toggle expansion', async () => {
+      const node = createMockNode({
+        type: 'object',
+        isExpandable: true,
+      })
+
+      const wrapper = mountTreeNode({
+        props: { node },
+      })
+
+      await wrapper.find('.tree-node').trigger('keydown', { key: ' ' })
+
+      expect(wrapper.emitted('toggle-expansion')).toBeTruthy()
+    })
+
+    it('handles Ctrl+C to copy node data', async () => {
+      const node = createMockNode({
+        value: 'test value',
+      })
+
+      const wrapper = mountTreeNode({
+        props: { node },
+      })
+
+      await wrapper.find('.tree-node').trigger('keydown', { key: 'c', ctrlKey: true })
+
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('"test value"')
+    })
+
+    it('handles Ctrl+K to copy key', async () => {
+      const node = createMockNode({
+        key: 'testKey',
+      })
+
+      const wrapper = mountTreeNode({
+        props: { node },
+      })
+
+      await wrapper.find('.tree-node').trigger('keydown', { key: 'k', ctrlKey: true })
+
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('testKey')
+    })
+
+    it('handles Ctrl+P to copy path', async () => {
+      const node = createMockNode({
+        path: ['root', 'test'],
+      })
+
+      const wrapper = mountTreeNode({
+        props: { node },
+      })
+
+      await wrapper.find('.tree-node').trigger('keydown', { key: 'p', ctrlKey: true })
+
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('root.test')
+    })
+
+    it('handles Shift+F10 to show context menu', async () => {
+      const node = createMockNode()
+
+      const wrapper = mountTreeNode({
+        props: { node },
+      })
+
+      await wrapper.find('.tree-node').trigger('keydown', { key: 'F10', shiftKey: true })
+
+      expect(wrapper.findComponent(ContextMenu).props('isVisible')).toBe(true)
+    })
+
+    it('focuses node when clicked', async () => {
+      const node = createMockNode()
+
+      const wrapper = mountTreeNode({
+        props: { node },
+      })
+
+      const treeNode = wrapper.find('.tree-node')
+      await treeNode.trigger('click')
+
+      // Check if the node has focus (tabindex should be 0 when selected)
+      expect(wrapper.emitted('node-select')).toBeTruthy()
+    })
+  })
+
   describe('Accessibility', () => {
     it('has proper ARIA labels for expand button', () => {
       const node = createMockNode({
@@ -462,6 +715,7 @@ describe('TreeNode', () => {
       })
 
       expect(wrapper.find('.expand-button').attributes('aria-label')).toBe('Expand')
+      expect(wrapper.find('.expand-button').attributes('aria-expanded')).toBe('false')
     })
 
     it('updates ARIA label when expanded', () => {
@@ -478,9 +732,10 @@ describe('TreeNode', () => {
       })
 
       expect(wrapper.find('.expand-button').attributes('aria-label')).toBe('Collapse')
+      expect(wrapper.find('.expand-button').attributes('aria-expanded')).toBe('true')
     })
 
-    it('has proper title attributes for copy functionality', () => {
+    it('has proper title and aria-label attributes for interactive elements', () => {
       const node = createMockNode({
         key: 'testKey',
         value: 'testValue',
@@ -491,7 +746,52 @@ describe('TreeNode', () => {
       })
 
       expect(wrapper.find('.node-key').attributes('title')).toBe('Copy key: testKey')
+      expect(wrapper.find('.node-key').attributes('aria-label')).toBe(
+        'Key: "testKey", press Enter to copy',
+      )
       expect(wrapper.find('.node-value').attributes('title')).toBe('Copy value: "testValue"')
+      expect(wrapper.find('.node-value').attributes('aria-label')).toBe(
+        'Value: "testValue", press Enter to copy',
+      )
+    })
+
+    it('has proper tabindex for keyboard navigation', () => {
+      const node = createMockNode()
+
+      const wrapper = mountTreeNode({
+        props: {
+          node,
+          isSelected: true,
+        },
+      })
+
+      expect(wrapper.find('.tree-node').attributes('tabindex')).toBe('0')
+    })
+
+    it('has tabindex -1 when not selected', () => {
+      const node = createMockNode()
+
+      const wrapper = mountTreeNode({
+        props: {
+          node,
+          isSelected: false,
+        },
+      })
+
+      expect(wrapper.find('.tree-node').attributes('tabindex')).toBe('-1')
+    })
+
+    it('has focus ring styles', () => {
+      const node = createMockNode()
+
+      const wrapper = mountTreeNode({
+        props: { node },
+      })
+
+      const treeNode = wrapper.find('.tree-node')
+      expect(treeNode.classes()).toContain('focus:outline-none')
+      expect(treeNode.classes()).toContain('focus:ring-2')
+      expect(treeNode.classes()).toContain('focus:ring-blue-500')
     })
   })
 })

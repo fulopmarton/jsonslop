@@ -14,36 +14,359 @@ body {
   padding: 0;
 }
 
+/* Enhanced Color Scheme for JSON Data Types */
+:root {
+  /* JSON Data Type Colors - Light Theme */
+  --json-string: #059669; /* emerald-600 */
+  --json-string-hover: #047857; /* emerald-700 */
+  --json-number: #2563eb; /* blue-600 */
+  --json-number-hover: #1d4ed8; /* blue-700 */
+  --json-boolean: #7c3aed; /* violet-600 */
+  --json-boolean-hover: #6d28d9; /* violet-700 */
+  --json-null: #6b7280; /* gray-500 */
+  --json-null-hover: #4b5563; /* gray-600 */
+  --json-key: #374151; /* gray-700 */
+  --json-key-hover: #1f2937; /* gray-800 */
+
+  /* Interactive Element Colors */
+  --interactive-primary: #3b82f6; /* blue-500 */
+  --interactive-primary-hover: #2563eb; /* blue-600 */
+  --interactive-secondary: #6b7280; /* gray-500 */
+  --interactive-secondary-hover: #4b5563; /* gray-600 */
+
+  /* Status Colors */
+  --status-success: #10b981; /* emerald-500 */
+  --status-warning: #f59e0b; /* amber-500 */
+  --status-error: #ef4444; /* red-500 */
+  --status-info: #3b82f6; /* blue-500 */
+
+  /* Background Colors */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f9fafb; /* gray-50 */
+  --bg-tertiary: #f3f4f6; /* gray-100 */
+  --bg-accent: #eff6ff; /* blue-50 */
+
+  /* Border Colors */
+  --border-primary: #e5e7eb; /* gray-200 */
+  --border-secondary: #d1d5db; /* gray-300 */
+  --border-accent: #dbeafe; /* blue-200 */
+
+  /* Text Colors */
+  --text-primary: #111827; /* gray-900 */
+  --text-secondary: #6b7280; /* gray-500 */
+  --text-tertiary: #9ca3af; /* gray-400 */
+}
+
+/* Dark Theme Colors */
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* JSON Data Type Colors - Dark Theme */
+    --json-string: #34d399; /* emerald-400 */
+    --json-string-hover: #10b981; /* emerald-500 */
+    --json-number: #60a5fa; /* blue-400 */
+    --json-number-hover: #3b82f6; /* blue-500 */
+    --json-boolean: #a78bfa; /* violet-400 */
+    --json-boolean-hover: #8b5cf6; /* violet-500 */
+    --json-null: #9ca3af; /* gray-400 */
+    --json-null-hover: #6b7280; /* gray-500 */
+    --json-key: #d1d5db; /* gray-300 */
+    --json-key-hover: #f3f4f6; /* gray-100 */
+
+    /* Interactive Element Colors */
+    --interactive-primary: #60a5fa; /* blue-400 */
+    --interactive-primary-hover: #3b82f6; /* blue-500 */
+    --interactive-secondary: #9ca3af; /* gray-400 */
+    --interactive-secondary-hover: #d1d5db; /* gray-300 */
+
+    /* Status Colors */
+    --status-success: #34d399; /* emerald-400 */
+    --status-warning: #fbbf24; /* amber-400 */
+    --status-error: #f87171; /* red-400 */
+    --status-info: #60a5fa; /* blue-400 */
+
+    /* Background Colors */
+    --bg-primary: #111827; /* gray-900 */
+    --bg-secondary: #1f2937; /* gray-800 */
+    --bg-tertiary: #374151; /* gray-700 */
+    --bg-accent: #1e3a8a; /* blue-900 */
+
+    /* Border Colors */
+    --border-primary: #374151; /* gray-700 */
+    --border-secondary: #4b5563; /* gray-600 */
+    --border-accent: #1e40af; /* blue-800 */
+
+    /* Text Colors */
+    --text-primary: #f9fafb; /* gray-50 */
+    --text-secondary: #9ca3af; /* gray-400 */
+    --text-tertiary: #6b7280; /* gray-500 */
+  }
+}
+
 /* Link styles for future use */
 a {
   text-decoration: none;
-  color: #3b82f6;
+  color: var(--interactive-primary);
   transition: color 0.2s ease-in-out;
 }
 
 a:hover {
-  color: #1d4ed8;
+  color: var(--interactive-primary-hover);
 }
 
-/* Focus styles for accessibility */
-button:focus,
-input:focus,
-textarea:focus,
-select:focus {
-  outline: 2px solid #3b82f6;
+/* Enhanced Focus styles for accessibility with proper contrast */
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--interactive-primary);
   outline-offset: 2px;
+  border-radius: 4px;
 }
 
-/* Custom utility classes */
+/* Remove default focus outline for mouse users */
+button:focus:not(:focus-visible),
+input:focus:not(:focus-visible),
+textarea:focus:not(:focus-visible),
+select:focus:not(:focus-visible),
+[tabindex]:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Custom utility classes for consistent styling */
 .panel-header {
-  @apply px-4 py-3 border-b border-gray-200 bg-gray-50;
+  @apply px-4 py-3 border-b bg-gray-50 dark:bg-gray-800;
+  border-color: var(--border-primary);
 }
 
 .panel-content {
   @apply flex-1 p-4 overflow-auto;
+  background-color: var(--bg-primary);
 }
 
-/* Responsive breakpoints for mobile handling */
+/* JSON Data Type Styling Classes */
+.json-string {
+  color: var(--json-string);
+  transition: color 0.15s ease-in-out;
+}
+
+.json-string:hover {
+  color: var(--json-string-hover);
+}
+
+.json-number {
+  color: var(--json-number);
+  transition: color 0.15s ease-in-out;
+}
+
+.json-number:hover {
+  color: var(--json-number-hover);
+}
+
+.json-boolean {
+  color: var(--json-boolean);
+  transition: color 0.15s ease-in-out;
+}
+
+.json-boolean:hover {
+  color: var(--json-boolean-hover);
+}
+
+.json-null {
+  color: var(--json-null);
+  font-style: italic;
+  transition: color 0.15s ease-in-out;
+}
+
+.json-null:hover {
+  color: var(--json-null-hover);
+}
+
+.json-key {
+  color: var(--json-key);
+  font-weight: 500;
+  transition: color 0.15s ease-in-out;
+}
+
+.json-key:hover {
+  color: var(--json-key-hover);
+}
+
+/* Interactive Button Styles */
+.btn-primary {
+  @apply px-3 py-2 text-sm font-medium rounded-md transition-all duration-200;
+  background-color: var(--interactive-primary);
+  color: white;
+  border: 1px solid var(--interactive-primary);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: var(--interactive-primary-hover);
+  border-color: var(--interactive-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.btn-secondary {
+  @apply px-3 py-2 text-sm font-medium rounded-md transition-all duration-200;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-primary);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: var(--bg-tertiary);
+  border-color: var(--border-secondary);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.btn-secondary:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* Status Indicator Styles */
+.status-success {
+  color: var(--status-success);
+}
+
+.status-warning {
+  color: var(--status-warning);
+}
+
+.status-error {
+  color: var(--status-error);
+}
+
+.status-info {
+  color: var(--status-info);
+}
+
+/* Enhanced Hover Effects */
+.hover-lift {
+  transition:
+    transform 0.2s ease-in-out,
+    box-shadow 0.2s ease-in-out;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Tree Node Styling */
+.tree-node-hover {
+  @apply transition-all duration-200 rounded-md;
+  background-color: transparent;
+}
+
+.tree-node-hover:hover {
+  background-color: var(--bg-secondary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.tree-node-selected {
+  background-color: var(--bg-accent);
+  border-left: 3px solid var(--interactive-primary);
+}
+
+.tree-node-highlighted {
+  background-color: #fef3c7; /* amber-100 */
+  border-left: 3px solid #f59e0b; /* amber-500 */
+}
+
+@media (prefers-color-scheme: dark) {
+  .tree-node-highlighted {
+    background-color: #451a03; /* amber-950 */
+    border-left: 3px solid #fbbf24; /* amber-400 */
+  }
+}
+
+/* Responsive Design Adjustments */
 @media (max-width: 767px) {
-  /* Mobile styles will be handled by the component */
+  .panel-header {
+    @apply px-3 py-2;
+  }
+
+  .panel-content {
+    @apply p-3;
+  }
+
+  .btn-primary,
+  .btn-secondary {
+    @apply px-2 py-1 text-xs;
+  }
+}
+
+@media (max-width: 639px) {
+  .panel-header {
+    @apply px-2 py-2;
+  }
+
+  .panel-content {
+    @apply p-2;
+  }
+}
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+  :root {
+    --json-string: #006400; /* Dark green */
+    --json-number: #0000cd; /* Medium blue */
+    --json-boolean: #4b0082; /* Indigo */
+    --json-null: #000000; /* Black */
+    --json-key: #000000; /* Black */
+
+    --interactive-primary: #0000ff; /* Blue */
+    --interactive-primary-hover: #000080; /* Navy */
+
+    --border-primary: #000000; /* Black borders */
+    --border-secondary: #000000;
+  }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .hover-lift:hover {
+    transform: none;
+  }
+
+  .btn-primary:hover:not(:disabled),
+  .btn-secondary:hover:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* Print Styles */
+@media print {
+  .panel-header,
+  .search-bar,
+  button {
+    display: none !important;
+  }
+
+  .tree-node-hover:hover {
+    background-color: transparent !important;
+    box-shadow: none !important;
+  }
+
+  * {
+    color: black !important;
+    background: white !important;
+  }
 }
