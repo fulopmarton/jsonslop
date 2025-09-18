@@ -107,7 +107,15 @@ export class ValidationService {
   private isLikelyIncomplete(jsonString: string): boolean {
     const trimmed = jsonString.trim()
 
-    // Check for unclosed structures
+    // First try to parse the JSON to see if it's valid
+    try {
+      JSON.parse(trimmed)
+      return false // If it parses successfully, it's not incomplete
+    } catch (error) {
+      // JSON is invalid, now determine if it's incomplete or malformed
+    }
+
+    // Check for obviously incomplete structures
     const openBraces = (trimmed.match(/\{/g) || []).length
     const closeBraces = (trimmed.match(/\}/g) || []).length
     const openBrackets = (trimmed.match(/\[/g) || []).length
@@ -124,25 +132,22 @@ export class ValidationService {
     }
 
     // Check if it ends with an opening quote (incomplete string)
-    if (trimmed.match(/"[^"]*$/)) {
+    // Only consider it incomplete if it ends with a quote followed by non-quote characters
+    // and the last character is not a quote or closing bracket/brace
+    const endsWithIncompleteString = /:\s*"[^"]*$/.test(trimmed)
+    if (endsWithIncompleteString) {
       return true
     }
 
-    // Check for complete but malformed JSON (has balanced brackets but syntax errors)
-    // This should NOT be considered incomplete if brackets are balanced and looks complete
+    // If brackets are balanced and it looks like a complete structure,
+    // it's probably malformed rather than incomplete
     if (
       openBraces === closeBraces &&
       openBrackets === closeBrackets &&
-      !trimmed.endsWith(',') &&
-      !trimmed.match(/"[^"]*$/)
+      ((trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+        (trimmed.startsWith('[') && trimmed.endsWith(']')))
     ) {
-      // If it looks like a complete structure, it's malformed, not incomplete
-      if (
-        (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
-        (trimmed.startsWith('[') && trimmed.endsWith(']'))
-      ) {
-        return false
-      }
+      return false
     }
 
     return false

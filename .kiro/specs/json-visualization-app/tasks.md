@@ -21,7 +21,7 @@
   - Write comprehensive unit tests for various JSON formats and error cases
   - _Requirements: 1.2, 1.3, 5.1, 5.2, 5.4_
 
-- [ ] 4. Set up Pinia store for state management
+- [-] 4. Set up Pinia store for state management
   - Create main JSON store using Pinia for global state management
   - Implement reactive state for JSON data, validation errors, and UI preferences
   - Add actions for updating JSON, handling validation, and managing tree state
