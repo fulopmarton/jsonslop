@@ -1,7 +1,7 @@
 # Implementation Plan
 
 - [ ] 1. Set up project structure and development environment
-
+  - The project should be in a subfolder
   - Initialize Vue 3 project with TypeScript and Vite
   - Configure ESLint, Prettier, and Vitest testing framework
   - Set up basic folder structure for components, composables, stores, and types
