@@ -1,6 +1,7 @@
 <template>
   <div ref="nodeRef" :class="[
     'tree-node',
+    'relative',
     'flex',
     'items-start',
     'py-2',
@@ -120,8 +121,8 @@
       </span>
 
       <!-- Action buttons (visible on hover or focus) -->
-      <div v-if="isHovered || isSelected"
-        class="inline-flex ml-3 gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+      <div class="absolute right-2 top-1/2 transform -translate-y-1/2 flex gap-1 transition-opacity duration-200"
+        :class="{ 'opacity-100': isHovered || isSelected, 'opacity-0 pointer-events-none': !isHovered && !isSelected }">
         <!-- Copy button -->
         <button :class="[
           'copy-button',
@@ -518,15 +519,9 @@ const handleKeyDown = (event: KeyboardEvent) => {
   transform-origin: center;
 }
 
-/* Action buttons fade in/out */
-.inline-flex {
-  opacity: 0;
-  transition: opacity 0.2s ease-in-out;
-}
-
-.tree-node:hover .inline-flex,
-.tree-node:focus-within .inline-flex {
-  opacity: 1;
+/* Action buttons fade in/out with absolute positioning */
+.tree-node .absolute {
+  z-index: 10;
 }
 
 /* Enhanced focus styles */
