@@ -68,7 +68,7 @@
                         </svg>
                         <div>
                             <span class="text-red-700 font-medium">Line {{ error.line }}, Column {{ error.column
-                            }}:</span>
+                                }}:</span>
                             <span class="text-red-600 ml-1">{{ error.message }}</span>
                         </div>
                     </div>
@@ -84,7 +84,7 @@
                         </svg>
                         <div>
                             <span class="text-yellow-700 font-medium">Line {{ warning.line }}, Column {{ warning.column
-                            }}:</span>
+                                }}:</span>
                             <span class="text-yellow-600 ml-1">{{ warning.message }}</span>
                         </div>
                     </div>
@@ -139,7 +139,6 @@ const isEditorReady = ref(false)
 const editorValue = ref('')
 
 // Computed properties
-const hasContent = computed(() => rawJsonInput.value.trim().length > 0)
 const hasErrorsComputed = computed(() => validationErrors.value.length > 0)
 const hasWarningsComputed = computed(() => validationWarnings.value.length > 0)
 
@@ -148,23 +147,35 @@ const initializeEditor = async () => {
     if (!editorContainer.value) return
 
     try {
-        // Configure Monaco loader
-        loader.config({
-            paths: {
-                vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.53.0/min/vs'
-            }
-        })
+        // First try to use the direct Monaco import
+        if (monaco && monaco.editor && typeof monaco.editor.create === 'function') {
+            monacoInstance = monaco
+        } else {
+            // Fallback to loader
+            loader.config({
+                paths: {
+                    vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.53.0/min/vs'
+                }
+            })
 
-        // Load Monaco
-        monacoInstance = await loader.init()
+            // Load Monaco
+            monacoInstance = await loader.init()
+        }
 
-        // Configure JSON language
-        monacoInstance.languages.json.jsonDefaults.setDiagnosticsOptions({
-            validate: true,
-            allowComments: false,
-            schemas: [],
-            enableSchemaRequest: false
-        })
+        // Validate that Monaco loaded correctly
+        if (!monacoInstance || !monacoInstance.editor || typeof monacoInstance.editor.create !== 'function') {
+            throw new Error('Monaco Editor failed to load properly')
+        }
+
+        // Configure JSON language (with null check)
+        if (monacoInstance.languages?.json?.jsonDefaults) {
+            monacoInstance.languages.json.jsonDefaults.setDiagnosticsOptions({
+                validate: true,
+                allowComments: false,
+                schemas: [],
+                enableSchemaRequest: false
+            })
+        }
 
         // Create editor
         editor = monacoInstance.editor.create(editorContainer.value, {
@@ -194,6 +205,11 @@ const initializeEditor = async () => {
             }
         })
 
+        // Validate that editor was created successfully
+        if (!editor) {
+            throw new Error('Failed to create Monaco Editor instance')
+        }
+
         // Set up event listeners
         setupEditorEventListeners()
 
@@ -203,7 +219,48 @@ const initializeEditor = async () => {
         isEditorReady.value = true
     } catch (error) {
         console.error('Failed to initialize Monaco Editor:', error)
+        // Create a fallback textarea if Monaco fails
+        createFallbackEditor()
     }
+}
+
+// Create a fallback textarea editor if Monaco fails to load
+const createFallbackEditor = () => {
+    if (!editorContainer.value) return
+
+    // Clear the container
+    editorContainer.value.innerHTML = ''
+
+    // Create a textarea as fallback
+    const textarea = document.createElement('textarea')
+    textarea.value = rawJsonInput.value
+    textarea.className = 'w-full h-full p-4 font-mono text-sm border-none outline-none resize-none bg-white'
+    textarea.placeholder = 'Enter your JSON here...'
+
+    // Add event listeners
+    textarea.addEventListener('input', (e) => {
+        const target = e.target as HTMLTextAreaElement
+        editorValue.value = target.value
+        debounceUpdateStore(target.value)
+    })
+
+    // Add to container
+    editorContainer.value.appendChild(textarea)
+
+    // Create a mock editor object for compatibility
+    editor = {
+        getValue: () => textarea.value,
+        setValue: (value: string) => { textarea.value = value },
+        focus: () => textarea.focus(),
+        dispose: () => textarea.remove(),
+        onDidChangeModelContent: () => ({ dispose: () => { } }),
+        onDidChangeCursorPosition: () => ({ dispose: () => { } }),
+        deltaDecorations: () => [],
+        updateOptions: () => { },
+        getAction: () => ({ run: () => { } })
+    } as any
+
+    isEditorReady.value = true
 }
 
 // Set up editor event listeners
@@ -222,13 +279,13 @@ const setupEditorEventListeners = () => {
     })
 
     // Listen for cursor position changes to show context
-    editor.onDidChangeCursorPosition((e) => {
+    editor.onDidChangeCursorPosition(() => {
         // Could be used for showing context information
     })
 }
 
 // Debounced store update
-let updateTimeout: NodeJS.Timeout | null = null
+let updateTimeout: number | null = null
 const debounceUpdateStore = (value: string) => {
     if (updateTimeout) {
         clearTimeout(updateTimeout)
@@ -247,39 +304,45 @@ const updateErrorDecorations = () => {
 
     // Add error decorations
     validationErrors.value.forEach((error) => {
-        decorations.push({
-            range: new monacoInstance.Range(error.line, error.column, error.line, error.column + 1),
-            options: {
-                isWholeLine: false,
-                className: 'error-decoration',
-                glyphMarginClassName: 'error-glyph',
-                hoverMessage: { value: error.message },
-                minimap: {
-                    color: '#ff0000',
-                    position: monacoInstance.editor.MinimapPosition.Inline
+        if (monacoInstance) {
+            decorations.push({
+                range: new monacoInstance.Range(error.line, error.column, error.line, error.column + 1),
+                options: {
+                    isWholeLine: false,
+                    className: 'error-decoration',
+                    glyphMarginClassName: 'error-glyph',
+                    hoverMessage: { value: error.message },
+                    minimap: {
+                        color: '#ff0000',
+                        position: monacoInstance.editor.MinimapPosition.Inline
+                    }
                 }
-            }
-        })
+            })
+        }
     })
 
     // Add warning decorations
     validationWarnings.value.forEach((warning) => {
-        decorations.push({
-            range: new monacoInstance.Range(warning.line, warning.column, warning.line, warning.column + 1),
-            options: {
-                isWholeLine: false,
-                className: 'warning-decoration',
-                glyphMarginClassName: 'warning-glyph',
-                hoverMessage: { value: warning.message },
-                minimap: {
-                    color: '#ffaa00',
-                    position: monacoInstance.editor.MinimapPosition.Inline
+        if (monacoInstance) {
+            decorations.push({
+                range: new monacoInstance.Range(warning.line, warning.column, warning.line, warning.column + 1),
+                options: {
+                    isWholeLine: false,
+                    className: 'warning-decoration',
+                    glyphMarginClassName: 'warning-glyph',
+                    hoverMessage: { value: warning.message },
+                    minimap: {
+                        color: '#ffaa00',
+                        position: monacoInstance.editor.MinimapPosition.Inline
+                    }
                 }
-            }
-        })
+            })
+        }
     })
 
-    editor.deltaDecorations([], decorations)
+    if (decorations.length > 0) {
+        editor.deltaDecorations([], decorations)
+    }
 }
 
 // Get editor theme based on preferences
@@ -325,8 +388,12 @@ const formatJson = () => {
 // Watch for external changes to rawJsonInput
 watch(rawJsonInput, (newValue) => {
     if (editor && newValue !== editorValue.value) {
-        editor.setValue(newValue)
-        editorValue.value = newValue
+        try {
+            editor.setValue(newValue)
+            editorValue.value = newValue
+        } catch (error) {
+            console.warn('Failed to update editor value:', error)
+        }
     }
 })
 
@@ -336,13 +403,13 @@ watch([validationErrors, validationWarnings], () => {
 }, { deep: true })
 
 // Watch for UI preference changes
-watch(() => uiPreferences.value.theme, (newTheme) => {
+watch(() => uiPreferences.value.theme, () => {
     if (editor && monacoInstance) {
         monacoInstance.editor.setTheme(getEditorTheme())
     }
 })
 
-watch(() => uiPreferences.value.fontSize, (newSize) => {
+watch(() => uiPreferences.value.fontSize, () => {
     if (editor) {
         editor.updateOptions({ fontSize: getEditorFontSize() })
     }
