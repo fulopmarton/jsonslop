@@ -42,9 +42,7 @@ describe('JSON Store', () => {
       expect(store.validationErrors).toEqual([])
       expect(store.validationWarnings).toEqual([])
       expect(store.validationSuggestions).toEqual([])
-      expect(store.isValidating).toBe(false)
       expect(store.searchQuery).toBe('')
-      expect(store.isProcessing).toBe(false)
     })
 
     it('should initialize with default UI preferences', () => {
@@ -67,6 +65,18 @@ describe('JSON Store', () => {
       expect(store.treeState.selectedNode).toBeNull()
       expect(store.treeState.searchResults).toEqual([])
       expect(store.treeState.currentSearchIndex).toBe(-1)
+    })
+
+    it('should initialize graph state correctly', () => {
+      const store = useJsonStore()
+
+      expect(store.graphState.nodes).toEqual([])
+      expect(store.graphState.links).toEqual([])
+      expect(store.graphState.selectedNodeId).toBeNull()
+      expect(store.graphState.highlightedNodes).toBeInstanceOf(Set)
+      expect(store.graphState.highlightedNodes.size).toBe(0)
+      expect(store.graphState.layoutType).toBe('force')
+      expect(store.graphState.zoomTransform).toEqual({ x: 0, y: 0, k: 1 })
     })
   })
 
@@ -112,6 +122,27 @@ describe('JSON Store', () => {
 
       expect(store.jsonTree.length).toBeGreaterThan(0)
       expect(store.totalNodes).toBeGreaterThan(0)
+    })
+
+    it('should build graph structure for valid JSON', async () => {
+      const store = useJsonStore()
+      const jsonData = {
+        users: [
+          { id: 1, name: 'John' },
+          { id: 2, name: 'Jane' },
+        ],
+        settings: {
+          theme: 'dark',
+          notifications: true,
+        },
+      }
+
+      await store.updateJsonInput(JSON.stringify(jsonData))
+
+      expect(store.graphNodes.length).toBeGreaterThan(0)
+      expect(store.graphLinks.length).toBeGreaterThan(0)
+      expect(store.graphState.selectedNodeId).toBeNull()
+      expect(store.graphState.highlightedNodes.size).toBe(0)
     })
 
     it('should clear data when input is empty', async () => {
@@ -277,6 +308,199 @@ describe('JSON Store', () => {
     })
   })
 
+  describe('Graph State Management', () => {
+    let store: ReturnType<typeof useJsonStore>
+
+    beforeEach(async () => {
+      store = useJsonStore()
+      const jsonData = {
+        users: [
+          { id: 1, name: 'John Doe' },
+          { id: 2, name: 'Jane Smith' },
+        ],
+        settings: {
+          theme: 'dark',
+          notifications: true,
+        },
+      }
+      await store.updateJsonInput(JSON.stringify(jsonData))
+    })
+
+    it('should update graph data correctly', () => {
+      expect(store.graphNodes.length).toBeGreaterThan(0)
+      expect(store.graphLinks.length).toBeGreaterThan(0)
+
+      // Verify root node exists
+      const rootNode = store.graphNodes.find((node) => node.id === 'root')
+      expect(rootNode).toBeTruthy()
+      expect(rootNode?.key).toBe('root')
+    })
+
+    it('should select and deselect graph nodes', () => {
+      // Find a valid node ID from the actual graph
+      const availableNodes = store.graphNodes
+      expect(availableNodes.length).toBeGreaterThan(0)
+
+      const nodeId = availableNodes[0].id
+
+      expect(store.isGraphNodeSelected(nodeId)).toBe(false)
+      expect(store.selectedGraphNode).toBeNull()
+
+      store.selectGraphNode(nodeId)
+      expect(store.isGraphNodeSelected(nodeId)).toBe(true)
+      expect(store.selectedGraphNode?.id).toBe(nodeId)
+      expect(store.graphState.highlightedNodes.size).toBeGreaterThan(0)
+
+      store.selectGraphNode(null)
+      expect(store.isGraphNodeSelected(nodeId)).toBe(false)
+      expect(store.selectedGraphNode).toBeNull()
+      expect(store.graphState.highlightedNodes.size).toBe(0)
+    })
+
+    it('should highlight connected nodes when selecting', () => {
+      // Find a node that has connections
+      const availableNodes = store.graphNodes
+      const nodeWithChildren = availableNodes.find((node) => node.children.length > 0)
+      expect(nodeWithChildren).toBeTruthy()
+
+      const nodeId = nodeWithChildren!.id
+
+      store.selectGraphNode(nodeId)
+
+      expect(store.graphState.highlightedNodes.has(nodeId)).toBe(true)
+      expect(store.highlightedConnections.has(nodeId)).toBe(true)
+
+      // Should highlight connected nodes
+      expect(store.graphState.highlightedNodes.size).toBeGreaterThan(1)
+    })
+
+    it('should set layout type', () => {
+      expect(store.graphState.layoutType).toBe('force')
+
+      store.setLayoutType('hierarchical')
+      expect(store.graphState.layoutType).toBe('hierarchical')
+
+      store.setLayoutType('tree')
+      expect(store.graphState.layoutType).toBe('tree')
+    })
+
+    it('should update zoom transform', () => {
+      const transform = { x: 100, y: 200, k: 1.5 }
+
+      store.updateZoomTransform(transform)
+
+      expect(store.graphState.zoomTransform).toEqual(transform)
+    })
+
+    it('should highlight specific nodes', () => {
+      const availableNodes = store.graphNodes
+      expect(availableNodes.length).toBeGreaterThan(1)
+
+      const nodeIds = [availableNodes[0].id, availableNodes[1].id]
+
+      store.highlightGraphNodes(nodeIds)
+
+      expect(store.graphState.highlightedNodes.size).toBe(2)
+      nodeIds.forEach((id) => {
+        expect(store.isGraphNodeHighlighted(id)).toBe(true)
+      })
+    })
+
+    it('should clear graph highlights', () => {
+      const availableNodes = store.graphNodes
+      const nodeIds = [availableNodes[0].id, availableNodes[1].id]
+
+      store.highlightGraphNodes(nodeIds)
+      expect(store.graphState.highlightedNodes.size).toBe(2)
+
+      store.clearGraphHighlights()
+      expect(store.graphState.highlightedNodes.size).toBe(0)
+      nodeIds.forEach((id) => {
+        expect(store.isGraphNodeHighlighted(id)).toBe(false)
+      })
+    })
+
+    it('should get graph node by ID', () => {
+      const availableNodes = store.graphNodes
+      expect(availableNodes.length).toBeGreaterThan(0)
+
+      const nodeId = availableNodes[0].id
+      const expectedKey = availableNodes[0].key
+
+      const node = store.getGraphNodeById(nodeId)
+      expect(node).toBeTruthy()
+      expect(node?.id).toBe(nodeId)
+      expect(node?.key).toBe(expectedKey)
+
+      const nonExistentNode = store.getGraphNodeById('nonexistent')
+      expect(nonExistentNode).toBeNull()
+    })
+
+    it('should filter graph nodes based on search query', () => {
+      const allNodes = store.graphNodes.length
+      expect(allNodes).toBeGreaterThan(0)
+
+      // Initially no search, should return all nodes
+      expect(store.filteredGraphNodes.length).toBe(allNodes)
+
+      // Search for specific term
+      store.updateSearchQuery('users')
+      const filteredNodes = store.filteredGraphNodes
+      expect(filteredNodes.length).toBeLessThanOrEqual(allNodes)
+
+      // Should include nodes that match the search
+      const hasMatchingNode = filteredNodes.some(
+        (node) =>
+          String(node.key).toLowerCase().includes('users') ||
+          String(node.value).toLowerCase().includes('users'),
+      )
+      expect(hasMatchingNode).toBe(true)
+
+      // Clear search
+      store.clearSearch()
+      expect(store.filteredGraphNodes.length).toBe(allNodes)
+    })
+
+    it('should compute highlighted connections correctly', () => {
+      // No selection initially
+      expect(store.highlightedConnections.size).toBe(0)
+
+      // Find a node that has connections
+      const availableNodes = store.graphNodes
+      const nodeWithChildren = availableNodes.find((node) => node.children.length > 0)
+      expect(nodeWithChildren).toBeTruthy()
+
+      const nodeId = nodeWithChildren!.id
+      store.selectGraphNode(nodeId)
+
+      expect(store.highlightedConnections.size).toBeGreaterThan(0)
+      expect(store.highlightedConnections.has(nodeId)).toBe(true)
+    })
+
+    it('should clear graph state when clearing all data', () => {
+      // Ensure we have graph data
+      expect(store.graphNodes.length).toBeGreaterThan(0)
+      expect(store.graphLinks.length).toBeGreaterThan(0)
+
+      // Select a node and set some state
+      store.selectGraphNode('root.users')
+      store.setLayoutType('hierarchical')
+      store.updateZoomTransform({ x: 100, y: 200, k: 1.5 })
+
+      // Clear all data
+      store.clearAllData()
+
+      // Verify graph state is cleared
+      expect(store.graphNodes).toEqual([])
+      expect(store.graphLinks).toEqual([])
+      expect(store.graphState.selectedNodeId).toBeNull()
+      expect(store.graphState.highlightedNodes.size).toBe(0)
+      expect(store.graphState.zoomTransform).toEqual({ x: 0, y: 0, k: 1 })
+      // Layout type should remain as it's a preference
+      expect(store.graphState.layoutType).toBe('hierarchical')
+    })
+  })
+
   describe('UI Preferences', () => {
     it('should update UI preferences', () => {
       const store = useJsonStore()
@@ -392,6 +616,12 @@ describe('JSON Store', () => {
       expect(store.searchQuery).toBe('')
       expect(store.treeState.selectedNode).toBeNull()
       expect(store.expandedNodeCount).toBe(0)
+
+      // Graph state should also be cleared
+      expect(store.graphNodes).toEqual([])
+      expect(store.graphLinks).toEqual([])
+      expect(store.graphState.selectedNodeId).toBeNull()
+      expect(store.graphState.highlightedNodes.size).toBe(0)
     })
   })
 

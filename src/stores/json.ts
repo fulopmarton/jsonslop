@@ -1,8 +1,20 @@
 import { ref, computed, watch } from 'vue'
 import { defineStore } from 'pinia'
-import type { JSONNode, ValidationError, TreeState, ParseResult } from '@/types'
+import type {
+  JSONNode,
+  ValidationError,
+  TreeState,
+  ParseResult,
+  GraphNode,
+  GraphLink,
+  GraphData,
+  GraphState,
+  LayoutType,
+  ViewType,
+} from '@/types'
 import { parseJSON } from '@/utils/json-parser'
 import { buildTree } from '@/utils/tree-builder'
+import { GraphBuilder } from '@/utils/graph-builder'
 import { validationService, type ValidationResult } from '@/services/validationService'
 
 export interface UIPreferences {
@@ -32,6 +44,23 @@ export const useJsonStore = defineStore('json', () => {
     searchResults: [],
     currentSearchIndex: -1,
   })
+
+  // Graph state management
+  const graphState = ref<GraphState>({
+    nodes: [],
+    links: [],
+    selectedNodeId: null,
+    highlightedNodes: new Set<string>(),
+    layoutType: 'force',
+    zoomTransform: {
+      x: 0,
+      y: 0,
+      k: 1,
+    },
+  })
+
+  // View state
+  const currentView = ref<ViewType>('tree')
 
   // Search state
   const searchQuery = ref<string>('')
@@ -63,6 +92,49 @@ export const useJsonStore = defineStore('json', () => {
   const hasWarnings = computed(() => validationWarnings.value.length > 0)
   const totalNodes = computed(() => countNodes(jsonTree.value))
   const expandedNodeCount = computed(() => treeState.value.expandedNodes.size)
+
+  // Graph computed properties
+  const graphNodes = computed(() => graphState.value.nodes)
+  const graphLinks = computed(() => graphState.value.links)
+  const selectedGraphNode = computed(() =>
+    graphState.value.selectedNodeId
+      ? graphState.value.nodes.find((node) => node.id === graphState.value.selectedNodeId) || null
+      : null,
+  )
+  const filteredGraphNodes = computed(() => {
+    if (!searchQuery.value.trim()) {
+      return graphState.value.nodes
+    }
+
+    const query = searchQuery.value.toLowerCase()
+    return graphState.value.nodes.filter((node) => {
+      const keyMatch = String(node.key).toLowerCase().includes(query)
+      const valueMatch = String(node.value).toLowerCase().includes(query)
+      return keyMatch || valueMatch
+    })
+  })
+
+  const highlightedConnections = computed(() => {
+    if (!graphState.value.selectedNodeId) {
+      return new Set<string>()
+    }
+
+    const connections = new Set<string>()
+    const selectedId = graphState.value.selectedNodeId
+
+    // Find all links connected to the selected node
+    graphState.value.links.forEach((link) => {
+      const sourceId = typeof link.source === 'string' ? link.source : link.source.id
+      const targetId = typeof link.target === 'string' ? link.target : link.target.id
+
+      if (sourceId === selectedId || targetId === selectedId) {
+        connections.add(sourceId)
+        connections.add(targetId)
+      }
+    })
+
+    return connections
+  })
 
   // Enhanced status indicators
   const statusMessage = computed(() => {
@@ -133,6 +205,11 @@ export const useJsonStore = defineStore('json', () => {
           // Build tree structure
           jsonTree.value = buildTree(parseResult.data)
           console.log('Built tree:', jsonTree.value) // Debug log
+
+          // Build graph structure
+          const graphData = GraphBuilder.buildGraph(parseResult.data)
+          updateGraphData(graphData)
+          console.log('Built graph:', graphData) // Debug log
 
           // Auto-expand nodes based on preferences
           autoExpandNodes()
@@ -250,6 +327,75 @@ export const useJsonStore = defineStore('json', () => {
     treeState.value.currentSearchIndex = -1
   }
 
+  // Graph state management actions
+  const updateGraphData = (graphData: GraphData) => {
+    graphState.value.nodes = graphData.nodes
+    graphState.value.links = graphData.links
+    // Reset selection when new data is loaded
+    graphState.value.selectedNodeId = null
+    graphState.value.highlightedNodes.clear()
+  }
+
+  const selectGraphNode = (nodeId: string | null) => {
+    graphState.value.selectedNodeId = nodeId
+
+    // Update highlighted nodes based on selection
+    if (nodeId) {
+      const highlightedIds = new Set<string>()
+      highlightedIds.add(nodeId)
+
+      // Add connected nodes to highlights
+      graphState.value.links.forEach((link) => {
+        const sourceId = typeof link.source === 'string' ? link.source : link.source.id
+        const targetId = typeof link.target === 'string' ? link.target : link.target.id
+
+        if (sourceId === nodeId) {
+          highlightedIds.add(targetId)
+        } else if (targetId === nodeId) {
+          highlightedIds.add(sourceId)
+        }
+      })
+
+      graphState.value.highlightedNodes = highlightedIds
+    } else {
+      graphState.value.highlightedNodes.clear()
+    }
+  }
+
+  const setLayoutType = (layoutType: LayoutType) => {
+    graphState.value.layoutType = layoutType
+  }
+
+  const updateZoomTransform = (transform: { x: number; y: number; k: number }) => {
+    graphState.value.zoomTransform = { ...transform }
+  }
+
+  const highlightGraphNodes = (nodeIds: string[]) => {
+    graphState.value.highlightedNodes = new Set(nodeIds)
+  }
+
+  const clearGraphHighlights = () => {
+    graphState.value.highlightedNodes.clear()
+  }
+
+  // View management actions
+  const setCurrentView = (view: ViewType) => {
+    currentView.value = view
+    savePreferencesToStorage()
+  }
+
+  const getGraphNodeById = (nodeId: string): GraphNode | null => {
+    return graphState.value.nodes.find((node) => node.id === nodeId) || null
+  }
+
+  const isGraphNodeSelected = (nodeId: string): boolean => {
+    return graphState.value.selectedNodeId === nodeId
+  }
+
+  const isGraphNodeHighlighted = (nodeId: string): boolean => {
+    return graphState.value.highlightedNodes.has(nodeId)
+  }
+
   // UI preferences management
   const updateUIPreferences = (preferences: Partial<UIPreferences>) => {
     uiPreferences.value = { ...uiPreferences.value, ...preferences }
@@ -279,6 +425,16 @@ export const useJsonStore = defineStore('json', () => {
     clearSearch()
     treeState.value.expandedNodes.clear()
     treeState.value.selectedNode = null
+
+    // Clear graph state
+    graphState.value.nodes = []
+    graphState.value.links = []
+    graphState.value.selectedNodeId = null
+    graphState.value.highlightedNodes.clear()
+    graphState.value.zoomTransform = { x: 0, y: 0, k: 1 }
+
+    // Reset view to tree
+    currentView.value = 'tree'
   }
 
   const getNodeByPath = (path: string): JSONNode | null => {
@@ -300,7 +456,11 @@ export const useJsonStore = defineStore('json', () => {
   // Persistence functions
   const savePreferencesToStorage = () => {
     try {
-      localStorage.setItem('json-viz-preferences', JSON.stringify(uiPreferences.value))
+      const preferencesToSave = {
+        ...uiPreferences.value,
+        currentView: currentView.value,
+      }
+      localStorage.setItem('json-viz-preferences', JSON.stringify(preferencesToSave))
     } catch (error) {
       console.warn('Failed to save preferences to localStorage:', error)
     }
@@ -310,8 +470,11 @@ export const useJsonStore = defineStore('json', () => {
     try {
       const stored = localStorage.getItem('json-viz-preferences')
       if (stored) {
-        const parsed = JSON.parse(stored) as UIPreferences
+        const parsed = JSON.parse(stored) as UIPreferences & { currentView?: ViewType }
         uiPreferences.value = { ...uiPreferences.value, ...parsed }
+        if (parsed.currentView) {
+          currentView.value = parsed.currentView
+        }
       }
     } catch (error) {
       console.warn('Failed to load preferences from localStorage:', error)
@@ -476,8 +639,10 @@ export const useJsonStore = defineStore('json', () => {
     validationWarnings,
     validationSuggestions,
     treeState,
+    graphState,
     searchQuery,
     uiPreferences,
+    currentView,
 
     // Computed
     hasValidJson,
@@ -491,6 +656,12 @@ export const useJsonStore = defineStore('json', () => {
     validationStatus,
     statusMessage,
     statusColor,
+    // Graph computed
+    graphNodes,
+    graphLinks,
+    selectedGraphNode,
+    filteredGraphNodes,
+    highlightedConnections,
 
     // Actions
     updateJsonInput,
@@ -515,5 +686,17 @@ export const useJsonStore = defineStore('json', () => {
     isNodeSelected,
     isNodeInSearchResults,
     initializeStore,
+    // Graph actions
+    updateGraphData,
+    selectGraphNode,
+    setLayoutType,
+    updateZoomTransform,
+    highlightGraphNodes,
+    clearGraphHighlights,
+    getGraphNodeById,
+    isGraphNodeSelected,
+    isGraphNodeHighlighted,
+    // View actions
+    setCurrentView,
   }
 })

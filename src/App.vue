@@ -4,6 +4,7 @@ import { ref, onErrorCaptured, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import JSONInputPanel from '@/components/JSONInputPanel.vue'
 import VisualizationPanel from '@/components/VisualizationPanel.vue'
+import ViewToggle from '@/components/ViewToggle.vue'
 import { useJsonStore } from '@/stores/json'
 
 // Store integration for global error handling
@@ -237,9 +238,15 @@ const retryOperation = () => {
         <div class="flex flex-col flex-1"
           :style="{ width: `${100 - leftPanelWidth}%`, backgroundColor: 'var(--bg-primary)' }">
           <div class="panel-header">
-            <h2 class="text-base sm:text-lg font-semibold" style="color: var(--text-primary);">JSON Visualization</h2>
-            <p class="text-xs sm:text-sm" style="color: var(--text-secondary);">Interactive tree view of your JSON data
-            </p>
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="text-base sm:text-lg font-semibold" style="color: var(--text-primary);">JSON Visualization
+                </h2>
+                <p class="text-xs sm:text-sm" style="color: var(--text-secondary);">Interactive view of your JSON data
+                </p>
+              </div>
+              <ViewToggle />
+            </div>
           </div>
           <div class="flex-1 overflow-hidden">
             <VisualizationPanel />
