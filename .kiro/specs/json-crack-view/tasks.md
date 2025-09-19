@@ -83,7 +83,7 @@
   - Write tests for native SVG rendering and interaction handling
   - _Requirements: 2.4, 4.3, 4.4_
 
-- [-] 12. Implement JSONCrack-style rectangular nodes
+- [x] 12. Implement JSONCrack-style rectangular nodes
   - Replace circular nodes with rectangular nodes containing all properties
   - Display object properties as rows within node rectangles
   - Show array indices and values within array nodes

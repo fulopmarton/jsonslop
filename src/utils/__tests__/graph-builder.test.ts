@@ -477,7 +477,7 @@ describe('Graph Builder Utilities', () => {
         expect(stats.nodesByType.number).toBe(0) // Primitives don't create separate nodes
         expect(stats.nodesByType.boolean).toBe(0) // Primitives don't create separate nodes
         expect(stats.nodesByType.null).toBe(0) // Primitives don't create separate nodes
-        expect(stats.avgChildrenPerNode).toBeCloseTo(4 / 3) // 4 total children / 3 nodes (root has 2, users has 0, settings has 0, but we count all children arrays)
+        expect(stats.avgChildrenPerNode).toBeCloseTo(2 / 3) // 2 total children / 3 nodes (root has 2, users has 0, settings has 0)
       })
     })
   })
