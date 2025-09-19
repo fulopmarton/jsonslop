@@ -481,12 +481,19 @@ export const useJsonStore = defineStore('json', () => {
       if (stored) {
         const parsed = JSON.parse(stored) as UIPreferences & { currentView?: ViewType }
         uiPreferences.value = { ...uiPreferences.value, ...parsed }
+        // Only load currentView from storage if it exists, otherwise keep default 'tree'
         if (parsed.currentView) {
           currentView.value = parsed.currentView
         }
       }
+      // Ensure tree is the default if no stored preference exists
+      if (!stored) {
+        currentView.value = 'tree'
+      }
     } catch (error) {
       console.warn('Failed to load preferences from localStorage:', error)
+      // Fallback to tree view on error
+      currentView.value = 'tree'
     }
   }
 

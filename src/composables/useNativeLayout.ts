@@ -33,8 +33,8 @@ export interface UseNativeLayoutReturn {
 const DEFAULT_OPTIONS: NativeLayoutOptions = {
   width: 800,
   height: 600,
-  nodeSpacing: 60,
-  levelSpacing: 180,
+  nodeSpacing: 80,
+  levelSpacing: 220,
   centerForce: 0.1,
   iterations: 300,
   layoutType: 'hierarchical',

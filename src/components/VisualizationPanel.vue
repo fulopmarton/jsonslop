@@ -17,9 +17,6 @@
       </div>
 
       <div class="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
-        <!-- View Toggle -->
-        <ViewToggle v-if="hasValidJson" />
-
         <!-- Expand/Collapse All buttons (only show for tree view) -->
         <div v-if="currentView === 'tree'" class="flex items-center space-x-1 sm:space-x-2">
           <button @click="expandAll" class="btn-secondary text-xs px-2 py-1 sm:px-3 sm:py-1 hover-lift"
@@ -196,7 +193,6 @@ import { useJsonStore } from '@/stores/json'
 import TreeNode from './TreeNode.vue'
 import SearchBar from './SearchBar.vue'
 import GraphCanvas from './GraphCanvas.vue'
-import ViewToggle from './ViewToggle.vue'
 import type { JSONNode, GraphNode } from '@/types'
 
 // Store
