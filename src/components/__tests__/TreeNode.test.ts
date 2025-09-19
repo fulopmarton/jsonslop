@@ -631,7 +631,7 @@ describe('TreeNode', () => {
       expect(wrapper.emitted('toggle-expansion')).toBeTruthy()
     })
 
-    it('handles Ctrl+C to copy node data', async () => {
+    it('handles Ctrl+Shift+C to copy node data', async () => {
       const node = createMockNode({
         value: 'test value',
       })
@@ -640,7 +640,9 @@ describe('TreeNode', () => {
         props: { node },
       })
 
-      await wrapper.find('.tree-node').trigger('keydown', { key: 'c', ctrlKey: true })
+      await wrapper
+        .find('.tree-node')
+        .trigger('keydown', { key: 'C', ctrlKey: true, shiftKey: true })
 
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith('"test value"')
     })

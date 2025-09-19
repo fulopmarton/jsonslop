@@ -385,7 +385,7 @@ const contextMenuItems = computed((): ContextMenuItem[] => [
   {
     label: props.node.isExpandable ? 'Copy Subtree' : 'Copy Value',
     action: copyNodeData,
-    shortcut: 'Ctrl+C',
+    shortcut: 'Ctrl+Shift+C',
     disabled: false,
   },
   {

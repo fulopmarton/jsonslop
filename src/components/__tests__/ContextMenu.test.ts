@@ -13,7 +13,7 @@ describe('ContextMenu', () => {
     {
       label: 'Copy Value',
       action: vi.fn(),
-      shortcut: 'Ctrl+C',
+      shortcut: 'Ctrl+Shift+C',
       disabled: false,
     },
     {
@@ -92,7 +92,7 @@ describe('ContextMenu', () => {
     expect(items[0].text()).toContain('Ctrl+K')
 
     expect(items[1].text()).toContain('Copy Value')
-    expect(items[1].text()).toContain('Ctrl+C')
+    expect(items[1].text()).toContain('Ctrl+Shift+C')
   })
 
   it('applies disabled styling to disabled items', () => {

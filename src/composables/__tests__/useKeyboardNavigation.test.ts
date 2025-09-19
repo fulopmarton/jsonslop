@@ -179,11 +179,11 @@ describe('useKeyboardNavigation', () => {
     expect(mockJsonStore.toggleNodeExpansion).toHaveBeenCalledWith('root.user')
   })
 
-  it('should handle Ctrl+C to copy selected node', () => {
+  it('should handle Ctrl+Shift+C to copy selected node', () => {
     const { activate } = useKeyboardNavigation(mockOptions)
     activate()
 
-    const mockEvent = new KeyboardEvent('keydown', { key: 'c', ctrlKey: true })
+    const mockEvent = new KeyboardEvent('keydown', { key: 'C', ctrlKey: true, shiftKey: true })
     Object.defineProperty(mockEvent, 'preventDefault', {
       value: vi.fn(),
     })

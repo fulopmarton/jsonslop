@@ -44,7 +44,7 @@ export function useGraphInteractions(options: GraphInteractionOptions = {}) {
     items.push({
       label: 'Copy Value',
       action: () => copyNodeValue(node),
-      shortcut: 'Ctrl+C',
+      shortcut: 'Ctrl+Shift+C',
     })
 
     // Copy node path

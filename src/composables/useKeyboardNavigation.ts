@@ -56,8 +56,8 @@ export function useKeyboardNavigation(options: KeyboardNavigationOptions = {}) {
           options.onToggleExpansion?.(selectedNode)
         }
         break
-      case 'c':
-        if (event.ctrlKey || event.metaKey) {
+      case 'C':
+        if ((event.ctrlKey || event.metaKey) && event.shiftKey) {
           event.preventDefault()
           copySelectedNode()
         }

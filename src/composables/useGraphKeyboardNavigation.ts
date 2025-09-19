@@ -90,8 +90,8 @@ export function useGraphKeyboardNavigation(
         event.preventDefault()
         navigateToLast()
         break
-      case 'c':
-        if (event.ctrlKey || event.metaKey) {
+      case 'C':
+        if ((event.ctrlKey || event.metaKey) && event.shiftKey) {
           event.preventDefault()
           copyCurrentNode()
         }
