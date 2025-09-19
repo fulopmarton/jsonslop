@@ -11,7 +11,8 @@
                 </svg>
             </div>
             <input ref="searchInput" v-model="searchQuery" type="text"
-                :placeholder="isSearching ? 'Searching...' : 'Search keys and values...'" :class="[
+                :placeholder="isSearching ? 'Digging through the slop...' : 'Hunt for keys, values, whatever...'"
+                :class="[
                     'block w-full pl-10 pr-10 py-2 border rounded-md leading-5 text-sm transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-opacity-50',
                     { 'animate-pulse': isSearching }
                 ]" :style="{
@@ -42,7 +43,7 @@
                     :style="{
                         color: hasSearchResults ? 'var(--interactive-primary)' : 'var(--text-tertiary)',
                         backgroundColor: 'transparent'
-                    }" aria-label="Previous result" title="Previous result (Shift+Enter)">
+                    }" aria-label="Previous result" title="Hunt backwards (Shift+Enter)">
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
                     </svg>
@@ -52,7 +53,7 @@
                     :style="{
                         color: hasSearchResults ? 'var(--interactive-primary)' : 'var(--text-tertiary)',
                         backgroundColor: 'transparent'
-                    }" aria-label="Next result" title="Next result (Enter)">
+                    }" aria-label="Next result" title="Keep hunting (Enter)">
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                     </svg>
@@ -63,7 +64,7 @@
         <!-- No results indicator -->
         <div v-else-if="searchQuery && !hasSearchResults" class="text-sm font-medium"
             style="color: var(--text-secondary);">
-            No results
+            Nothing found in this slop
         </div>
     </div>
 </template>

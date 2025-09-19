@@ -529,6 +529,70 @@ export const useJsonStore = defineStore('json', () => {
   const initializeStore = () => {
     loadPreferencesFromStorage()
     loadTreeStateFromStorage()
+
+    // Load default sample data if no JSON input exists
+    if (!rawJsonInput.value.trim()) {
+      const sampleData = {
+        welcome: 'JsonSlop Demo! 🍲',
+        description: 'This is some sample JSON to show off what JsonSlop can do',
+        features: {
+          visualization: {
+            tree_view: true,
+            graph_view: true,
+            search: 'Hunt through your data like a pro',
+          },
+          interaction: {
+            copy_values: 'Click any value to copy it',
+            expand_collapse: 'Toggle nodes to explore',
+            keyboard_nav: ['Arrow keys', 'Enter', 'Space'],
+          },
+        },
+        sample_data: {
+          users: [
+            {
+              id: 1,
+              name: 'Alice Developer',
+              email: 'alice@jsonslop.dev',
+              skills: ['JavaScript', 'Vue.js', 'JSON wrangling'],
+              active: true,
+              projects: 42,
+            },
+            {
+              id: 2,
+              name: 'Bob DataWrangler',
+              email: 'bob@jsonslop.dev',
+              skills: ['Python', 'Data Analysis', 'API Design'],
+              active: true,
+              projects: 37,
+            },
+          ],
+          config: {
+            api_endpoint: 'https://api.jsonslop.dev/v1',
+            timeout: 5000,
+            retry_attempts: 3,
+            features: {
+              dark_mode: true,
+              auto_save: false,
+              notifications: {
+                email: true,
+                push: false,
+                sms: null,
+              },
+            },
+          },
+        },
+        meta: {
+          version: '1.0.0',
+          created: '2025-01-19T10:30:00Z',
+          tags: ['demo', 'sample', 'json', 'slop'],
+          nested_levels: 4,
+          total_properties: 25,
+        },
+      }
+
+      const sampleJson = JSON.stringify(sampleData, null, 2)
+      updateJsonInput(sampleJson)
+    }
   }
 
   // Watch for changes to save state

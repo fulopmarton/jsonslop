@@ -1,6 +1,7 @@
 {
   "name": "jsonslop",
   "version": "0.0.0",
+  "description": "Turn your JSON chaos into beautiful, interactive visualizations. When your data is a hot mess, JsonSlop makes it make sense.",
   "private": true,
   "type": "module",
   "engines": {

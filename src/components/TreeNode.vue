@@ -71,7 +71,7 @@
         'hover:bg-gray-100',
         'dark:hover:bg-gray-700',
       ]" tabindex="0" @click.stop="copyKey" @keydown.enter.stop="copyKey" @keydown.space.stop="copyKey"
-        :title="`Copy key: ${node.key}`" :aria-label="`Key: ${formatKey(node.key)}, press Enter to copy`">
+        :title="`Snag this key: ${node.key}`" :aria-label="`Key: ${formatKey(node.key)}, press Enter to copy`">
         {{ formatKey(node.key) }}
       </span>
 
@@ -95,7 +95,7 @@
         'break-all',
         getValueTypeClass(node.type),
       ]" tabindex="0" @click.stop="copyValue" @keydown.enter.stop="copyValue" @keydown.space.stop="copyValue"
-        :title="`Copy value: ${formatValue(node.value)}`"
+        :title="`Grab this value: ${formatValue(node.value)}`"
         :aria-label="`Value: ${formatValue(node.value)}, press Enter to copy`">
         {{ formatValue(node.value) }}
       </span>
@@ -141,7 +141,7 @@
           'focus-visible:ring-opacity-50',
           'rounded-md',
           'hover-lift',
-        ]" @click.stop="copyNodeData" :title="'Copy ' + (node.isExpandable ? 'subtree' : 'value')"
+        ]" @click.stop="copyNodeData" :title="'Yoink this ' + (node.isExpandable ? 'whole chunk' : 'value')"
           :aria-label="'Copy ' + (node.isExpandable ? 'subtree' : 'value')">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path

@@ -3,7 +3,8 @@
         style="background-color: var(--bg-primary); border-color: var(--border-primary);">
         <!-- Header -->
         <div class="flex items-center justify-between p-3 sm:p-4 border-b panel-header">
-            <h2 class="text-base sm:text-lg font-semibold truncate" style="color: var(--text-primary);">JSON Input</h2>
+            <h2 class="text-base sm:text-lg font-semibold truncate" style="color: var(--text-primary);">Drop Your JSON
+                Here</h2>
             <div class="flex items-center gap-2 flex-shrink-0">
                 <!-- Enhanced Validation Status -->
                 <div data-testid="validation-status" class="flex items-center gap-2">
@@ -52,7 +53,7 @@
                 <!-- Clear Button -->
                 <button @click="clearInput" :disabled="!rawJsonInput.trim()"
                     class="btn-secondary text-xs px-2 py-1 sm:px-3 sm:py-1 hover-lift"
-                    :class="{ 'opacity-50 cursor-not-allowed': !rawJsonInput.trim() }" title="Clear input">
+                    :class="{ 'opacity-50 cursor-not-allowed': !rawJsonInput.trim() }" title="Wipe the slate clean">
                     Clear
                 </button>
             </div>
@@ -79,7 +80,7 @@
                         </svg>
                         <div class="min-w-0 flex-1">
                             <span class="font-medium status-error">Line {{ error.line }}, Column {{ error.column
-                                }}:</span>
+                            }}:</span>
                             <span class="status-error ml-1 break-words">{{ error.message }}</span>
                         </div>
                     </div>
@@ -95,7 +96,7 @@
                         </svg>
                         <div class="min-w-0 flex-1">
                             <span class="font-medium status-warning">Line {{ warning.line }}, Column {{ warning.column
-                                }}:</span>
+                            }}:</span>
                             <span class="status-warning ml-1 break-words">{{ warning.message }}</span>
                         </div>
                     </div>
@@ -266,7 +267,7 @@ const createFallbackEditor = () => {
     const textarea = document.createElement('textarea')
     textarea.value = rawJsonInput.value
     textarea.className = 'w-full h-full p-4 font-mono text-sm border-none outline-none resize-none bg-white'
-    textarea.placeholder = 'Enter your JSON here...'
+    textarea.placeholder = 'Paste your messy JSON here and watch the magic happen...'
 
     // Add event listeners
     textarea.addEventListener('input', (e) => {

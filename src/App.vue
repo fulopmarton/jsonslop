@@ -90,10 +90,10 @@ const retryOperation = () => {
       style="border-color: var(--border-primary);">
       <div class="flex items-center justify-between">
         <div class="min-w-0 flex-1">
-          <h1 class="text-xl sm:text-2xl font-bold truncate" style="color: var(--text-primary);">JSON Visualization App
+          <h1 class="text-xl sm:text-2xl font-bold truncate" style="color: var(--text-primary);">JsonSlop 🍲
           </h1>
-          <p class="text-xs sm:text-sm mt-1 truncate" style="color: var(--text-secondary);">Visualize and explore JSON
-            data structures</p>
+          <p class="text-xs sm:text-sm mt-1 truncate" style="color: var(--text-secondary);">Making sense of your JSON
+            chaos, one slop at a time</p>
         </div>
 
         <!-- Global Status Indicator -->
@@ -177,10 +177,10 @@ const retryOperation = () => {
               </svg>
             </div>
           </div>
-          <h2 class="text-lg sm:text-xl font-semibold mb-3" style="color: var(--text-primary);">Welcome to JSON
-            Visualizer</h2>
-          <p class="text-sm sm:text-base mb-6" style="color: var(--text-secondary);">Paste or type your JSON data in the
-            left panel to get started. The visualization will appear here automatically.</p>
+          <h2 class="text-lg sm:text-xl font-semibold mb-3" style="color: var(--text-primary);">Ready to Slop Some JSON?
+          </h2>
+          <p class="text-sm sm:text-base mb-6" style="color: var(--text-secondary);">Drop your messy JSON in the left
+            panel and watch the magic happen. No judgment here - we've seen worse.</p>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs sm:text-sm" style="color: var(--text-secondary);">
             <div class="flex items-center gap-2">
               <svg class="w-4 h-4 status-success flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -240,9 +240,9 @@ const retryOperation = () => {
           <div class="panel-header">
             <div class="flex items-center justify-between">
               <div>
-                <h2 class="text-base sm:text-lg font-semibold" style="color: var(--text-primary);">JSON Visualization
+                <h2 class="text-base sm:text-lg font-semibold" style="color: var(--text-primary);">Your JSON, Visualized
                 </h2>
-                <p class="text-xs sm:text-sm" style="color: var(--text-secondary);">Interactive view of your JSON data
+                <p class="text-xs sm:text-sm" style="color: var(--text-secondary);">Now we're cooking with data
                 </p>
               </div>
               <ViewToggle />
@@ -275,10 +275,10 @@ const retryOperation = () => {
             </svg>
           </div>
         </div>
-        <h2 class="text-lg font-semibold mb-3" style="color: var(--text-primary);">Larger Screen Recommended</h2>
-        <p class="text-sm mb-4" style="color: var(--text-secondary);">This JSON visualization app works best on tablets
-          and
-          desktop screens for optimal viewing of complex data structures.</p>
+        <h2 class="text-lg font-semibold mb-3" style="color: var(--text-primary);">Whoa There, Tiny Screen!</h2>
+        <p class="text-sm mb-4" style="color: var(--text-secondary);">JsonSlop works best when it has room to breathe.
+          Grab
+          a tablet or desktop for the full sloppy experience.</p>
         <div class="text-xs p-3 rounded-md" style="background-color: var(--bg-accent); color: var(--text-secondary);">
           <p class="font-medium mb-1">Recommended: 640px+ width</p>
           <p>Current features may be limited on smaller screens</p>
