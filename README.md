@@ -1,6 +1,6 @@
-# json-visualization-app
+# JsonSlop
 
-This template should help get you started developing with Vue 3 in Vite.
+A powerful JSON visualization tool that transforms complex JSON data into interactive, explorable graphs and tree structures. Built with Vue 3 and D3.js for smooth, responsive data exploration.
 
 ## Recommended IDE Setup
 
