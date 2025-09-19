@@ -1,42 +1,36 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, type VueWrapper } from '@vue/test-utils'
 import GraphNode from '../GraphNode.vue'
-import type { GraphNode as GraphNodeType } from '@/types'
-
-// Mock D3 imports
-vi.mock('@/utils/d3-imports', () => ({
-  select: vi.fn(() => ({
-    call: vi.fn(),
-    on: vi.fn(),
-  })),
-  drag: vi.fn(() => ({
-    on: vi.fn().mockReturnThis(),
-  })),
-}))
+import type { GraphNode as GraphNodeType, NodeProperty } from '@/types'
 
 describe('GraphNode', () => {
   let wrapper: VueWrapper<any>
-  let mockSimulation: any
+
+  const createMockProperty = (overrides: Partial<NodeProperty> = {}): NodeProperty => ({
+    key: 'testProp',
+    value: 'testValue',
+    type: 'string',
+    hasChildNode: false,
+    ...overrides,
+  })
 
   const createMockNode = (overrides: Partial<GraphNodeType> = {}): GraphNodeType => ({
     id: 'test-node',
     key: 'testKey',
-    value: 'testValue',
-    type: 'string',
+    value: { testProp: 'testValue' },
+    type: 'object',
     path: ['root', 'testKey'],
     x: 100,
     y: 100,
+    width: 150,
+    height: 80,
     children: [],
     depth: 1,
     size: 20,
+    isExpanded: true,
+    hasChildren: false,
+    properties: [createMockProperty()],
     ...overrides,
-  })
-
-  beforeEach(() => {
-    mockSimulation = {
-      alphaTarget: vi.fn().mockReturnThis(),
-      restart: vi.fn().mockReturnThis(),
-    }
   })
 
   afterEach(() => {
@@ -47,7 +41,7 @@ describe('GraphNode', () => {
   })
 
   describe('Component Rendering', () => {
-    it('renders a basic node correctly', () => {
+    it('renders a rectangular node correctly', () => {
       const node = createMockNode()
       wrapper = mount(GraphNode, {
         props: { node },
@@ -55,8 +49,31 @@ describe('GraphNode', () => {
 
       expect(wrapper.find('.graph-node').exists()).toBe(true)
       expect(wrapper.find('.node-background').exists()).toBe(true)
-      expect(wrapper.find('.node-icon').exists()).toBe(true)
-      expect(wrapper.find('.node-label').exists()).toBe(true)
+      expect(wrapper.find('.node-header').exists()).toBe(true)
+      expect(wrapper.find('.node-header-text').exists()).toBe(true)
+      expect(wrapper.find('.node-type-badge').exists()).toBe(true)
+    })
+
+    it('renders property rows correctly', () => {
+      const properties = [
+        createMockProperty({ key: 'name', value: 'John', type: 'string' }),
+        createMockProperty({ key: 'age', value: 30, type: 'number' }),
+      ]
+      const node = createMockNode({ properties })
+      wrapper = mount(GraphNode, {
+        props: { node },
+      })
+
+      const propertyRows = wrapper.findAll('.property-row')
+      expect(propertyRows).toHaveLength(2)
+
+      const propertyKeys = wrapper.findAll('.property-key')
+      expect(propertyKeys[0].text()).toBe('name:')
+      expect(propertyKeys[1].text()).toBe('age:')
+
+      const propertyValues = wrapper.findAll('.property-value')
+      expect(propertyValues[0].text()).toBe('"John"')
+      expect(propertyValues[1].text()).toBe('30')
     })
 
     it('applies correct transform based on node position', () => {
@@ -78,27 +95,42 @@ describe('GraphNode', () => {
       const graphNode = wrapper.find('.graph-node')
       expect(graphNode.attributes('transform')).toBe('translate(0, 0)')
     })
+
+    it('uses node dimensions for rectangle size', () => {
+      const node = createMockNode({ width: 200, height: 120 })
+      wrapper = mount(GraphNode, {
+        props: { node },
+      })
+
+      const background = wrapper.find('.node-background')
+      expect(background.attributes('width')).toBe('200')
+      expect(background.attributes('height')).toBe('120')
+    })
   })
 
   describe('Node Type Styling', () => {
-    const nodeTypes: Array<{ type: GraphNodeType['type']; icon: string; expectedClass: string }> = [
-      { type: 'object', icon: '{}', expectedClass: 'node-type-object' },
-      { type: 'array', icon: '[]', expectedClass: 'node-type-array' },
-      { type: 'string', icon: '"', expectedClass: 'node-type-string' },
-      { type: 'number', icon: '#', expectedClass: 'node-type-number' },
-      { type: 'boolean', icon: '?', expectedClass: 'node-type-boolean' },
-      { type: 'null', icon: '∅', expectedClass: 'node-type-null' },
-    ]
+    const nodeTypes: Array<{ type: GraphNodeType['type']; badge: string; expectedClass: string }> =
+      [
+        { type: 'object', badge: 'OBJ', expectedClass: 'node-type-object' },
+        { type: 'array', badge: 'ARR', expectedClass: 'node-type-array' },
+        { type: 'string', badge: 'STR', expectedClass: 'node-type-string' },
+        { type: 'number', badge: 'NUM', expectedClass: 'node-type-number' },
+        { type: 'boolean', badge: 'BOOL', expectedClass: 'node-type-boolean' },
+        { type: 'null', badge: 'NULL', expectedClass: 'node-type-null' },
+      ]
 
-    nodeTypes.forEach(({ type, icon, expectedClass }) => {
-      it(`renders ${type} node with correct styling and icon`, () => {
-        const node = createMockNode({ type, value: type === 'null' ? null : `test${type}` })
+    nodeTypes.forEach(({ type, badge, expectedClass }) => {
+      it(`renders ${type} node with correct styling and type badge`, () => {
+        const properties = [
+          createMockProperty({ value: type === 'null' ? null : `test${type}`, type }),
+        ]
+        const node = createMockNode({ type, properties })
         wrapper = mount(GraphNode, {
           props: { node },
         })
 
         expect(wrapper.find('.graph-node').classes()).toContain(expectedClass)
-        expect(wrapper.find('.node-icon').text()).toBe(icon)
+        expect(wrapper.find('.node-type-badge').text()).toBe(badge)
       })
     })
   })
@@ -146,76 +178,106 @@ describe('GraphNode', () => {
     })
   })
 
-  describe('Node Sizing', () => {
-    it('calculates radius based on node size', () => {
-      const node = createMockNode({ size: 25 })
+  describe('Connection Points', () => {
+    it('renders connection points for properties with child nodes', () => {
+      const properties = [
+        createMockProperty({ key: 'child', hasChildNode: true, childNodeId: 'child-node' }),
+        createMockProperty({ key: 'primitive', hasChildNode: false }),
+      ]
+      const node = createMockNode({ properties })
       wrapper = mount(GraphNode, {
         props: { node },
       })
 
-      const circle = wrapper.find('.node-background')
-      const radius = parseInt(circle.attributes('r') || '0')
-      expect(radius).toBeGreaterThan(8) // Base minimum
-      expect(radius).toBeLessThanOrEqual(30) // Maximum size
+      const connectionPoints = wrapper.findAll('.connection-point')
+      expect(connectionPoints).toHaveLength(1) // Only one property has a child node
     })
 
-    it('increases radius for selected nodes', () => {
-      const node = createMockNode({ size: 20 })
-
-      // Test unselected node
+    it('positions connection points correctly', () => {
+      const properties = [createMockProperty({ hasChildNode: true, childNodeId: 'child' })]
+      const node = createMockNode({ properties, width: 150, height: 80 })
       wrapper = mount(GraphNode, {
-        props: { node, isSelected: false },
+        props: { node },
       })
-      const unselectedRadius = parseInt(wrapper.find('.node-background').attributes('r') || '0')
 
-      wrapper.unmount()
-
-      // Test selected node
-      wrapper = mount(GraphNode, {
-        props: { node, isSelected: true },
-      })
-      const selectedRadius = parseInt(wrapper.find('.node-background').attributes('r') || '0')
-
-      expect(selectedRadius).toBeGreaterThan(unselectedRadius)
+      const connectionPoint = wrapper.find('.connection-point')
+      expect(connectionPoint.attributes('cx')).toBe('150') // At right edge
+      expect(parseFloat(connectionPoint.attributes('cy') || '0')).toBeGreaterThan(24) // Below header
     })
   })
 
-  describe('Labels', () => {
-    it('displays node label by default', () => {
-      const node = createMockNode({ key: 'testLabel' })
+  describe('Property Display', () => {
+    it('displays property keys and values correctly', () => {
+      const properties = [
+        createMockProperty({ key: 'name', value: 'John Doe', type: 'string' }),
+        createMockProperty({ key: 'age', value: 25, type: 'number' }),
+        createMockProperty({ key: 'active', value: true, type: 'boolean' }),
+      ]
+      const node = createMockNode({ properties })
       wrapper = mount(GraphNode, {
         props: { node },
       })
 
-      const label = wrapper.find('.node-label')
-      expect(label.exists()).toBe(true)
-      expect(label.text()).toBe('testLabel')
+      const propertyKeys = wrapper.findAll('.property-key')
+      const propertyValues = wrapper.findAll('.property-value')
+
+      expect(propertyKeys[0].text()).toBe('name:')
+      expect(propertyValues[0].text()).toBe('"John Doe"')
+
+      expect(propertyKeys[1].text()).toBe('age:')
+      expect(propertyValues[1].text()).toBe('25')
+
+      expect(propertyKeys[2].text()).toBe('active:')
+      expect(propertyValues[2].text()).toBe('true')
     })
 
-    it('truncates long labels', () => {
-      const node = createMockNode({ key: 'thisIsAVeryLongLabelThatShouldBeTruncated' })
+    it('truncates long property keys', () => {
+      const properties = [
+        createMockProperty({ key: 'thisIsAVeryLongPropertyKeyThatShouldBeTruncated' }),
+      ]
+      const node = createMockNode({ properties })
       wrapper = mount(GraphNode, {
         props: { node },
       })
 
-      const label = wrapper.find('.node-label')
-      expect(label.text()).toContain('...')
-      expect(label.text().length).toBeLessThanOrEqual(15) // 12 chars + "..."
+      const propertyKey = wrapper.find('.property-key')
+      expect(propertyKey.text()).toContain('...')
+      expect(propertyKey.text().length).toBeLessThanOrEqual(16) // 12 chars + "..." + ":"
     })
 
-    it('hides labels when showLabels is false', () => {
-      const node = createMockNode()
+    it('formats different value types correctly', () => {
+      const properties = [
+        createMockProperty({ key: 'str', value: 'hello world', type: 'string' }),
+        createMockProperty({ key: 'num', value: 42, type: 'number' }),
+        createMockProperty({ key: 'bool', value: false, type: 'boolean' }),
+        createMockProperty({ key: 'nil', value: null, type: 'null' }),
+        createMockProperty({ key: 'obj', value: {}, type: 'object', hasChildNode: true }),
+        createMockProperty({ key: 'arr', value: [1, 2, 3], type: 'array', hasChildNode: true }),
+      ]
+      const node = createMockNode({ properties })
       wrapper = mount(GraphNode, {
-        props: { node, showLabels: false },
+        props: { node },
       })
 
-      expect(wrapper.find('.node-label').exists()).toBe(false)
+      const propertyValues = wrapper.findAll('.property-value')
+      expect(propertyValues[0].text()).toBe('"hello world"')
+      expect(propertyValues[1].text()).toBe('42')
+      expect(propertyValues[2].text()).toBe('false')
+      expect(propertyValues[3].text()).toBe('null')
+      expect(propertyValues[4].text()).toBe('{...}')
+      expect(propertyValues[5].text()).toBe('[3]')
     })
   })
 
   describe('Tooltips', () => {
     it('shows tooltip on mouse enter', async () => {
-      const node = createMockNode({ key: 'testKey', value: 'testValue', path: ['root', 'test'] })
+      const properties = [createMockProperty()]
+      const node = createMockNode({
+        key: 'testKey',
+        value: { testProp: 'testValue' },
+        path: ['root', 'test'],
+        properties,
+      })
       wrapper = mount(GraphNode, {
         props: { node },
       })
@@ -225,9 +287,9 @@ describe('GraphNode', () => {
       const tooltip = wrapper.find('.tooltip')
       expect(tooltip.exists()).toBe(true)
       expect(tooltip.find('.tooltip-key').text()).toBe('testKey')
-      expect(tooltip.find('.tooltip-type').text()).toBe('string')
-      expect(tooltip.find('.tooltip-value').text()).toBe('"testValue"')
+      expect(tooltip.find('.tooltip-type').text()).toBe('OBJECT')
       expect(tooltip.find('.tooltip-path').text()).toBe('root.test')
+      expect(tooltip.find('.tooltip-properties').text()).toBe('1 properties')
     })
 
     it('hides tooltip on mouse leave', async () => {
@@ -255,7 +317,8 @@ describe('GraphNode', () => {
       ]
 
       for (const testCase of testCases) {
-        const node = createMockNode({ value: testCase.value, type: testCase.type })
+        const properties = [createMockProperty({ value: testCase.value, type: testCase.type })]
+        const node = createMockNode({ value: testCase.value, type: testCase.type, properties })
         wrapper = mount(GraphNode, {
           props: { node },
         })
@@ -338,52 +401,76 @@ describe('GraphNode', () => {
   })
 
   describe('Drag Behavior', () => {
-    it('sets up drag behavior when simulation is provided', () => {
+    it('emits dragStart event on mouse down', async () => {
       const node = createMockNode()
-
-      wrapper = mount(GraphNode, {
-        props: { node, simulation: mockSimulation },
-      })
-
-      // Since we mocked the d3-imports module, we can verify the component mounts successfully
-      // and has the expected structure when simulation is provided
-      expect(wrapper.find('.graph-node').exists()).toBe(true)
-      expect(wrapper.props('simulation')).toStrictEqual(mockSimulation)
-    })
-
-    it('does not set up drag behavior without simulation', async () => {
-      const node = createMockNode()
-      const d3Imports = await import('@/utils/d3-imports')
-
       wrapper = mount(GraphNode, {
         props: { node },
       })
 
-      expect(d3Imports.drag).not.toHaveBeenCalled()
-    })
-
-    it('emits dragStart and dragEnd events', () => {
-      const node = createMockNode()
-      wrapper = mount(GraphNode, {
-        props: { node, simulation: mockSimulation },
-      })
-
-      // Simulate drag start
-      const vm = wrapper.vm as unknown
-      vm.isDragging = true
-      vm.$emit('dragStart', node)
-
-      // Simulate drag end
-      vm.isDragging = false
-      vm.$emit('dragEnd', node)
+      await wrapper.find('.graph-node').trigger('mousedown', { button: 0 })
 
       const dragStartEvents = wrapper.emitted('dragStart')
-      const dragEndEvents = wrapper.emitted('dragEnd')
-
       expect(dragStartEvents).toHaveLength(1)
       expect(dragStartEvents![0][0]).toEqual(node)
+    })
+
+    it('emits drag events during mouse movement', async () => {
+      const node = createMockNode({ x: 100, y: 100 })
+      wrapper = mount(GraphNode, {
+        props: { node },
+      })
+
+      // Start dragging
+      await wrapper.find('.graph-node').trigger('mousedown', {
+        button: 0,
+        clientX: 100,
+        clientY: 100,
+      })
+
+      // Simulate mouse move
+      const mouseMoveEvent = new MouseEvent('mousemove', {
+        clientX: 150,
+        clientY: 150,
+      })
+      document.dispatchEvent(mouseMoveEvent)
+
+      const dragEvents = wrapper.emitted('drag')
+      expect(dragEvents).toHaveLength(1)
+
+      // Check that the emitted node has updated position
+      const draggedNode = dragEvents![0][0] as GraphNodeType
+      expect(draggedNode.x).toBe(150) // 100 + (150 - 100)
+      expect(draggedNode.y).toBe(150) // 100 + (150 - 100)
+    })
+
+    it('emits dragEnd event on mouse up', async () => {
+      const node = createMockNode()
+      wrapper = mount(GraphNode, {
+        props: { node },
+      })
+
+      // Start dragging
+      await wrapper.find('.graph-node').trigger('mousedown', { button: 0 })
+
+      // End dragging
+      const mouseUpEvent = new MouseEvent('mouseup')
+      document.dispatchEvent(mouseUpEvent)
+
+      const dragEndEvents = wrapper.emitted('dragEnd')
       expect(dragEndEvents).toHaveLength(1)
       expect(dragEndEvents![0][0]).toEqual(node)
+    })
+
+    it('ignores non-left mouse button clicks', async () => {
+      const node = createMockNode()
+      wrapper = mount(GraphNode, {
+        props: { node },
+      })
+
+      await wrapper.find('.graph-node').trigger('mousedown', { button: 1 }) // Right click
+
+      const dragStartEvents = wrapper.emitted('dragStart')
+      expect(dragStartEvents).toBeUndefined()
     })
   })
 
@@ -441,13 +528,26 @@ describe('GraphNode', () => {
 
       // Update position multiple times
       for (let i = 1; i <= 5; i++) {
-        node.x = i * 10
-        node.y = i * 10
-        await wrapper.setProps({ node: { ...node } })
+        const updatedNode = { ...node, x: i * 10, y: i * 10 }
+        await wrapper.setProps({ node: updatedNode })
 
         const transform = wrapper.find('.graph-node').attributes('transform')
         expect(transform).toBe(`translate(${i * 10}, ${i * 10})`)
       }
+    })
+
+    it('handles large numbers of properties efficiently', () => {
+      const properties = Array.from({ length: 20 }, (_, i) =>
+        createMockProperty({ key: `prop${i}`, value: `value${i}` }),
+      )
+      const node = createMockNode({ properties })
+      wrapper = mount(GraphNode, {
+        props: { node },
+      })
+
+      const propertyRows = wrapper.findAll('.property-row')
+      expect(propertyRows).toHaveLength(20)
+      expect(wrapper.find('.graph-node').exists()).toBe(true)
     })
   })
 
@@ -465,9 +565,20 @@ describe('GraphNode', () => {
           props: { node },
         })
 
-        expect(wrapper.find('.node-label').text()).toBe(expected)
+        expect(wrapper.find('.node-header-text').text()).toBe(expected)
         wrapper.unmount()
       })
+    })
+
+    it('handles nodes with no properties', () => {
+      const node = createMockNode({ properties: [] })
+      wrapper = mount(GraphNode, {
+        props: { node },
+      })
+
+      const propertyRows = wrapper.findAll('.property-row')
+      expect(propertyRows).toHaveLength(0)
+      expect(wrapper.find('.graph-node').exists()).toBe(true)
     })
 
     it('handles nodes with complex nested values', async () => {
@@ -480,10 +591,26 @@ describe('GraphNode', () => {
         array: [1, 2, 3],
       }
 
+      const properties = [
+        createMockProperty({
+          key: 'nested',
+          value: complexValue.nested,
+          type: 'object',
+          hasChildNode: true,
+        }),
+        createMockProperty({
+          key: 'array',
+          value: complexValue.array,
+          type: 'array',
+          hasChildNode: true,
+        }),
+      ]
+
       const node = createMockNode({
         value: complexValue,
         type: 'object',
         path: ['root', 'complex'],
+        properties,
       })
 
       wrapper = mount(GraphNode, {
@@ -504,6 +631,19 @@ describe('GraphNode', () => {
       await wrapper.find('.graph-node').trigger('mouseenter')
       const tooltipPath = wrapper.find('.tooltip-path')
       expect(tooltipPath.text()).toBe('root')
+    })
+
+    it('handles very long property values', () => {
+      const longValue = 'a'.repeat(100)
+      const properties = [createMockProperty({ value: longValue, type: 'string' })]
+      const node = createMockNode({ properties })
+      wrapper = mount(GraphNode, {
+        props: { node },
+      })
+
+      const propertyValue = wrapper.find('.property-value')
+      expect(propertyValue.text()).toContain('...')
+      expect(propertyValue.text().length).toBeLessThan(longValue.length)
     })
   })
 })

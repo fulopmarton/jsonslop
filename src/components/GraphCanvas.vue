@@ -1,6 +1,8 @@
 <template>
     <div ref="containerRef" class="graph-canvas" :style="{ width: `${width}px`, height: `${height}px` }">
-        <svg ref="svgRef" :width="width" :height="height" class="graph-svg">
+        <svg ref="svgRef" :width="width" :height="height" class="graph-svg" @wheel="zoom.handleWheel"
+            @mousedown="zoom.handleMouseDown" @mousemove="zoom.handleMouseMove" @mouseup="zoom.handleMouseUp"
+            @click="handleCanvasClick">
             <defs>
                 <!-- Arrowhead marker for directed edges -->
                 <marker id="arrowhead" viewBox="0 -5 10 10" refX="8" refY="0" markerWidth="6" markerHeight="6"
@@ -10,12 +12,25 @@
             </defs>
 
             <!-- Container for zoom/pan transformations -->
-            <g ref="containerGroupRef" class="zoom-container">
-                <!-- Links group -->
-                <g ref="linksGroupRef" class="links-group"></g>
+            <g class="zoom-container" :transform="zoom.transformString.value">
+                <!-- Links -->
+                <g class="links-group">
+                    <line v-for="link in layout.links.value"
+                        :key="`${getNodeId(link.source)}-${getNodeId(link.target)}`" class="link"
+                        :x1="getNodeX(link.source)" :y1="getNodeY(link.source)" :x2="getNodeX(link.target)"
+                        :y2="getNodeY(link.target)" :stroke="getLinkStroke(link)"
+                        :stroke-width="getLinkStrokeWidth(link)" :opacity="getLinkOpacity(link)"
+                        marker-end="url(#arrowhead)" @click="handleLinkClick(link, $event)" />
+                </g>
 
-                <!-- Nodes group -->
-                <g ref="nodesGroupRef" class="nodes-group"></g>
+                <!-- Nodes -->
+                <g class="nodes-group">
+                    <GraphNodeComponent v-for="node in layout.nodes.value" :key="node.id" :node="node"
+                        :is-selected="isNodeSelected(node.id)" :is-highlighted="isNodeHighlighted(node.id)"
+                        :show-labels="true" @click="handleNodeClick" @double-click="handleNodeDoubleClick"
+                        @context-menu="handleNodeContextMenu" @drag-start="handleNodeDragStart" @drag="handleNodeDrag"
+                        @drag-end="handleNodeDragEnd" @focus="handleNodeFocus" @blur="handleNodeBlur" />
+                </g>
             </g>
         </svg>
 
@@ -34,16 +49,11 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue'
 import type { GraphNode, GraphLink, LayoutType, ForceLayoutOptions, LayoutStats } from '@/types'
-import {
-    select,
-    zoom,
-    zoomIdentity,
-    type D3Selection,
-    type D3ZoomBehavior,
-    type ZoomTransform,
-} from '@/utils/d3-imports'
-import { ForceLayout } from '@/utils/force-layout'
+import type { ZoomTransform } from '@/composables/useNativeZoom'
+import { useNativeZoom } from '@/composables/useNativeZoom'
+import { useNativeLayout } from '@/composables/useNativeLayout'
 import ContextMenu from './ContextMenu.vue'
+import GraphNodeComponent from './GraphNode.vue'
 import { useGraphInteractions } from '@/composables/useGraphInteractions'
 import { useGraphKeyboardNavigation } from '@/composables/useGraphKeyboardNavigation'
 import { useGraphSearch } from '@/composables/useGraphSearch'
@@ -90,9 +100,24 @@ const emit = defineEmits<Emits>()
 // Template refs
 const containerRef = ref<HTMLDivElement>()
 const svgRef = ref<SVGSVGElement>()
-const containerGroupRef = ref<SVGGElement>()
-const linksGroupRef = ref<SVGGElement>()
-const nodesGroupRef = ref<SVGGElement>()
+
+// Native zoom and pan
+const zoom = useNativeZoom({
+    bounds: { minScale: 0.1, maxScale: 10 },
+    onTransformChange: (transform) => {
+        emit('zoomChange', transform)
+    }
+})
+
+// Native layout engine
+const layout = useNativeLayout({
+    width: props.width,
+    height: props.height,
+    nodeSpacing: 80,
+    levelSpacing: 150,
+    centerForce: 0.1,
+    iterations: 300
+})
 
 // Graph interactions
 const {
@@ -100,13 +125,13 @@ const {
     selectedNodeId,
     highlightedNodes,
     contextMenuItems,
-    handleNodeClick,
-    handleNodeDoubleClick,
-    handleNodeContextMenu,
+    handleNodeClick: baseHandleNodeClick,
+    handleNodeDoubleClick: baseHandleNodeDoubleClick,
+    handleNodeContextMenu: baseHandleNodeContextMenu,
     handleNodeHover,
-    handleNodeFocus,
-    handleNodeBlur,
-    handleCanvasClick,
+    handleNodeFocus: baseHandleNodeFocus,
+    handleNodeBlur: baseHandleNodeBlur,
+    handleCanvasClick: baseHandleCanvasClick,
     hideContextMenu,
     isNodeSelected,
     isNodeHighlighted,
@@ -120,14 +145,14 @@ const {
 
 // Keyboard navigation
 const keyboardNav = useGraphKeyboardNavigation(
-    () => props.nodes,
+    () => layout.nodes.value,
     () => selectedNodeId.value,
     {
         onNodeSelect: (node) => {
-            handleNodeClick(node, {} as MouseEvent)
+            baseHandleNodeClick(node, {} as MouseEvent)
         },
         onNodeFocus: (node) => {
-            handleNodeFocus(node)
+            baseHandleNodeFocus(node)
             emit('nodeFocus', node)
         },
         onCopy: (text) => emit('copySuccess', text),
@@ -147,349 +172,146 @@ const graphSearch = useGraphSearch({
 
 // State
 const isLoading = ref(false)
-const forceLayout = ref<ForceLayout | null>(null)
-const zoomBehavior = ref<D3ZoomBehavior | null>(null)
-const currentTransform = ref<ZoomTransform>(zoomIdentity)
-const layoutStats = ref<LayoutStats>({
-    iterations: 0,
-    alpha: 1,
-    isConverged: false,
-    averageVelocity: 0,
-    maxVelocity: 0,
-    frameRate: 0,
-    lastTickTime: 0,
-})
 
-// D3 selections
-let svgSelection: D3Selection | null = null
-let containerGroupSelection: D3Selection | null = null
-let linksGroupSelection: D3Selection | null = null
-let nodesGroupSelection: D3Selection | null = null
-
-// Computed
-const forceLayoutOptions = computed((): ForceLayoutOptions => ({
-    width: props.width,
-    height: props.height,
-    ...props.forceOptions
-}))
-
-// Initialize D3 selections and setup
-const initializeD3 = () => {
-    if (!svgRef.value || !containerGroupRef.value || !linksGroupRef.value || !nodesGroupRef.value) {
+// Initialize native layout
+const initializeLayout = () => {
+    if (props.nodes.length === 0) {
+        console.log('GraphCanvas: No nodes to simulate')
         return
     }
 
-    svgSelection = select(svgRef.value)
-    containerGroupSelection = select(containerGroupRef.value)
-    linksGroupSelection = select(linksGroupRef.value)
-    nodesGroupSelection = select(nodesGroupRef.value)
-
-    setupZoomBehavior()
-}
-
-// Setup zoom and pan behavior
-const setupZoomBehavior = () => {
-    if (!svgSelection || !containerGroupSelection) return
-
-    zoomBehavior.value = zoom<SVGSVGElement, unknown>()
-        .scaleExtent([0.1, 10])
-        .on('zoom', (event) => {
-            const transform = event.transform as ZoomTransform
-            currentTransform.value = transform
-            containerGroupSelection!.attr('transform', transform.toString())
-            emit('zoomChange', transform)
-        })
-
-    svgSelection.call(zoomBehavior.value)
-
-    // Handle canvas clicks (when clicking on empty space)
-    svgSelection.on('click', (event) => {
-        if (event.target === svgRef.value) {
-            handleCanvasClick(event)
-            emit('canvasClick', event)
-        }
-    })
-}
-
-// Initialize force simulation
-const initializeSimulation = () => {
-    if (props.nodes.length === 0) return
-
-    // Dispose existing layout
-    if (forceLayout.value) {
-        forceLayout.value.dispose()
-    }
-
-    // Create new force layout
-    forceLayout.value = new ForceLayout(forceLayoutOptions.value)
+    console.log('GraphCanvas: Initializing layout with', props.nodes.length, 'nodes and', props.links.length, 'links')
 
     // Set up callbacks
-    forceLayout.value.onTick((stats) => {
-        layoutStats.value = stats
-        updatePositions()
+    layout.onTick((stats) => {
+        console.log('GraphCanvas: Layout tick', stats.iterations, 'alpha:', stats.alpha)
         emit('simulationTick', stats)
     })
 
-    forceLayout.value.onEnd((stats) => {
-        layoutStats.value = stats
+    layout.onEnd((stats) => {
+        console.log('GraphCanvas: Layout ended', stats)
         emit('simulationEnd', stats)
     })
 
     // Initialize with current data
-    forceLayout.value.initialize(props.nodes, props.links)
+    layout.initialize(props.nodes, props.links)
+
+    console.log('GraphCanvas: Layout initialized, isRunning:', layout.isRunning.value)
 }
 
-// Update node and link positions during simulation
-const updatePositions = () => {
-    if (!nodesGroupSelection || !linksGroupSelection) return
-
-    // Update link positions
-    linksGroupSelection.selectAll('.link')
-        .attr('x1', (d: any) => d.source.x ?? 0)
-        .attr('y1', (d: any) => d.source.y ?? 0)
-        .attr('x2', (d: any) => d.target.x ?? 0)
-        .attr('y2', (d: any) => d.target.y ?? 0)
-
-    // Update node positions
-    nodesGroupSelection.selectAll('.node')
-        .attr('transform', (d: any) => `translate(${d.x ?? 0},${d.y ?? 0})`)
+// Helper functions for template
+const getNodeId = (nodeRef: string | GraphNode): string => {
+    return typeof nodeRef === 'string' ? nodeRef : nodeRef.id
 }
 
-// Render links
-const renderLinks = () => {
-    if (!linksGroupSelection) return
-
-    const linkSelection = linksGroupSelection
-        .selectAll('.link')
-        .data(props.links, (d: any) => `${typeof d.source === 'string' ? d.source : d.source.id}-${typeof d.target === 'string' ? d.target : d.target.id}`)
-
-    // Remove old links
-    linkSelection.exit().remove()
-
-    // Add new links
-    const linkEnter = linkSelection.enter()
-        .append('line')
-        .attr('class', 'link')
-        .attr('stroke', '#666')
-        .attr('stroke-width', 1.5)
-        .attr('marker-end', 'url(#arrowhead)')
-        .style('opacity', 0)
-
-    // Handle link clicks
-    linkEnter.on('click', (event, d) => {
-        event.stopPropagation()
-        emit('linkClick', d as GraphLink, event)
-    })
-
-    // Merge and update all links
-    const linkUpdate = linkEnter.merge(linkSelection as any)
-
-    linkUpdate
-        .transition()
-        .duration(300)
-        .style('opacity', 1)
-        .attr('stroke-width', (d: any) => {
-            const sourceId = typeof d.source === 'string' ? d.source : d.source.id
-            const targetId = typeof d.target === 'string' ? d.target : d.target.id
-            return isNodeHighlighted(sourceId) || isNodeHighlighted(targetId) ? 3 : 1.5
-        })
-        .attr('stroke', (d: any) => {
-            const sourceId = typeof d.source === 'string' ? d.source : d.source.id
-            const targetId = typeof d.target === 'string' ? d.target : d.target.id
-            return isNodeHighlighted(sourceId) || isNodeHighlighted(targetId) ? '#007acc' : '#666'
-        })
-        .style('opacity', (d: any) => {
-            const sourceId = typeof d.source === 'string' ? d.source : d.source.id
-            const targetId = typeof d.target === 'string' ? d.target : d.target.id
-
-            // Handle search highlighting
-            if (graphSearch.hasGraphSearchResults.value) {
-                const sourceHighlighted = graphSearch.isNodeHighlightedBySearch(sourceId)
-                const targetHighlighted = graphSearch.isNodeHighlightedBySearch(targetId)
-                if (sourceHighlighted || targetHighlighted) {
-                    return 1 // Full opacity for search-related links
-                } else {
-                    return 0.2 // Dim non-search-related links
-                }
-            }
-
-            // Handle selection highlighting
-            if (selectedNodeId.value && !isNodeHighlighted(sourceId) && !isNodeHighlighted(targetId)) {
-                return 0.3 // Dim non-connected links when a node is selected
-            }
-            return 1
-        })
-}
-
-// Render nodes
-const renderNodes = () => {
-    if (!nodesGroupSelection) return
-
-    const nodeSelection = nodesGroupSelection
-        .selectAll('.node')
-        .data(props.nodes, (d: any) => d.id)
-
-    // Remove old nodes
-    nodeSelection.exit().remove()
-
-    // Add new nodes
-    const nodeEnter = nodeSelection.enter()
-        .append('g')
-        .attr('class', 'node')
-        .style('cursor', 'pointer')
-        .style('opacity', 0)
-
-    // Add circles for nodes
-    nodeEnter.append('circle')
-        .attr('r', (d: any) => d.size)
-        .attr('fill', (d: any) => getNodeColor(d.type))
-        .attr('stroke', '#fff')
-        .attr('stroke-width', 2)
-
-    // Add labels for nodes
-    nodeEnter.append('text')
-        .attr('dy', '.35em')
-        .attr('text-anchor', 'middle')
-        .attr('font-size', '12px')
-        .attr('font-family', 'Arial, sans-serif')
-        .attr('fill', '#333')
-        .text((d: any) => truncateLabel(String(d.key), 10))
-
-    // Handle node interactions
-    nodeEnter
-        .attr('data-node-id', (d: any) => d.id)
-        .attr('tabindex', 0)
-        .attr('role', 'button')
-        .attr('aria-label', (d: any) => `${d.type} node: ${d.key}`)
-        .on('click', (event, d) => {
-            handleNodeClick(d as GraphNode, event)
-            emit('nodeClick', d as GraphNode, event)
-        })
-        .on('dblclick', (event, d) => {
-            handleNodeDoubleClick(d as GraphNode, event)
-            emit('nodeDoubleClick', d as GraphNode, event)
-        })
-        .on('contextmenu', (event, d) => {
-            handleNodeContextMenu(d as GraphNode, event)
-        })
-        .on('mouseenter', (event, d) => {
-            handleNodeHover(d as GraphNode)
-            emit('nodeHover', d as GraphNode, event)
-        })
-        .on('mouseleave', (event) => {
-            handleNodeHover(null)
-            emit('nodeHover', null, event)
-        })
-        .on('focus', (event, d) => {
-            handleNodeFocus(d as GraphNode)
-            emit('nodeFocus', d as GraphNode)
-        })
-        .on('blur', (event, d) => {
-            handleNodeBlur(d as GraphNode)
-        })
-        .on('keydown', (event, d) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault()
-                handleNodeClick(d as GraphNode, event as unknown as MouseEvent)
-            }
-        })
-
-    // Merge and update all nodes
-    const nodeUpdate = nodeEnter.merge(nodeSelection as any)
-
-    nodeUpdate
-        .transition()
-        .duration(300)
-        .style('opacity', 1)
-
-    // Update node appearance based on selection, highlighting, and search
-    nodeUpdate.select('circle')
-        .attr('fill', (d: any) => {
-            if (isNodeSelected(d.id)) return '#ff6b35'
-            if (isNodeHighlighted(d.id)) return '#007acc'
-            if (graphSearch.isNodeHighlightedBySearch(d.id)) return '#10b981' // Green for search matches
-            return getNodeColor(d.type)
-        })
-        .attr('stroke-width', (d: any) => {
-            if (isNodeSelected(d.id)) return 4
-            if (isNodeHighlighted(d.id)) return 3
-            if (graphSearch.isNodeHighlightedBySearch(d.id)) return 3
-            return 2
-        })
-        .attr('stroke', (d: any) => {
-            if (isNodeSelected(d.id)) return '#333'
-            if (isNodeHighlighted(d.id)) return '#005a9e'
-            if (graphSearch.isNodeHighlightedBySearch(d.id)) return '#059669'
-            return '#fff'
-        })
-        .attr('r', (d: any) => {
-            const baseSize = d.size
-            if (isNodeSelected(d.id)) return baseSize * 1.2
-            if (isNodeHighlighted(d.id)) return baseSize * 1.1
-            if (graphSearch.isNodeHighlightedBySearch(d.id)) return baseSize * 1.15
-            return baseSize
-        })
-        .style('opacity', (d: any) => {
-            // Dim nodes that don't match search when search is active
-            if (graphSearch.hasGraphSearchResults.value && graphSearch.isNodeDimmedBySearch(d.id)) {
-                return 0.3
-            }
-            return 1
-        })
-
-    nodeUpdate.select('text')
-        .attr('fill', (d: any) => {
-            if (isNodeSelected(d.id) || isNodeHighlighted(d.id) || graphSearch.isNodeHighlightedBySearch(d.id)) return '#fff'
-            return '#333'
-        })
-        .style('opacity', (d: any) => {
-            // Dim text for nodes that don't match search when search is active
-            if (graphSearch.hasGraphSearchResults.value && graphSearch.isNodeDimmedBySearch(d.id)) {
-                return 0.4
-            }
-            return 1
-        })
-
-    // Add focus indicators
-    nodeUpdate
-        .style('outline', (d: any) => {
-            if (keyboardNav.focusedNodeId.value === d.id) return '2px solid #007acc'
-            return 'none'
-        })
-        .style('outline-offset', '2px')
-}
-
-// Get color for node based on type
-const getNodeColor = (type: GraphNode['type']): string => {
-    const colors = {
-        object: '#4CAF50',
-        array: '#2196F3',
-        string: '#FF9800',
-        number: '#9C27B0',
-        boolean: '#F44336',
-        null: '#607D8B'
+const getNodeX = (nodeRef: string | GraphNode): number => {
+    if (typeof nodeRef === 'string') {
+        const node = layout.nodes.value.find(n => n.id === nodeRef)
+        return node?.x ?? 0
     }
-    return colors[type] || '#666'
+    return nodeRef.x ?? 0
 }
 
-// Truncate label text
-const truncateLabel = (text: string, maxLength: number): string => {
-    if (text.length <= maxLength) return text
-    return text.substring(0, maxLength - 3) + '...'
+const getNodeY = (nodeRef: string | GraphNode): number => {
+    if (typeof nodeRef === 'string') {
+        const node = layout.nodes.value.find(n => n.id === nodeRef)
+        return node?.y ?? 0
+    }
+    return nodeRef.y ?? 0
+}
+
+const getLinkStroke = (link: GraphLink): string => {
+    const sourceId = getNodeId(link.source)
+    const targetId = getNodeId(link.target)
+    return isNodeHighlighted(sourceId) || isNodeHighlighted(targetId) ? '#007acc' : '#666'
+}
+
+const getLinkStrokeWidth = (link: GraphLink): number => {
+    const sourceId = getNodeId(link.source)
+    const targetId = getNodeId(link.target)
+    return isNodeHighlighted(sourceId) || isNodeHighlighted(targetId) ? 3 : 1.5
+}
+
+const getLinkOpacity = (link: GraphLink): number => {
+    const sourceId = getNodeId(link.source)
+    const targetId = getNodeId(link.target)
+
+    // Handle search highlighting
+    if (graphSearch.hasGraphSearchResults.value) {
+        const sourceHighlighted = graphSearch.isNodeHighlightedBySearch(sourceId)
+        const targetHighlighted = graphSearch.isNodeHighlightedBySearch(targetId)
+        if (sourceHighlighted || targetHighlighted) {
+            return 1 // Full opacity for search-related links
+        } else {
+            return 0.2 // Dim non-search-related links
+        }
+    }
+
+    // Handle selection highlighting
+    if (selectedNodeId.value && !isNodeHighlighted(sourceId) && !isNodeHighlighted(targetId)) {
+        return 0.3 // Dim non-connected links when a node is selected
+    }
+    return 1
+}
+
+// Event handlers
+const handleCanvasClick = (event: MouseEvent) => {
+    // Only handle clicks on the SVG background, not on nodes or links
+    if (event.target === svgRef.value && !zoom.isDragging.value) {
+        baseHandleCanvasClick(event)
+        emit('canvasClick', event)
+    }
+}
+
+const handleLinkClick = (link: GraphLink, event: MouseEvent) => {
+    event.stopPropagation()
+    emit('linkClick', link, event)
+}
+
+const handleNodeClick = (node: GraphNode, event: MouseEvent) => {
+    baseHandleNodeClick(node, event)
+    emit('nodeClick', node, event)
+}
+
+const handleNodeDoubleClick = (node: GraphNode, event: MouseEvent) => {
+    baseHandleNodeDoubleClick(node, event)
+    emit('nodeDoubleClick', node, event)
+}
+
+const handleNodeContextMenu = (node: GraphNode, event: MouseEvent) => {
+    baseHandleNodeContextMenu(node, event)
+}
+
+const handleNodeFocus = (node: GraphNode) => {
+    baseHandleNodeFocus(node)
+    emit('nodeFocus', node)
+}
+
+const handleNodeBlur = (node: GraphNode) => {
+    baseHandleNodeBlur(node)
+}
+
+const handleNodeDragStart = (node: GraphNode) => {
+    // Stop layout animation during drag
+    layout.stop()
+}
+
+const handleNodeDrag = (node: GraphNode) => {
+    // Node position is updated by the GraphNode component
+}
+
+const handleNodeDragEnd = (node: GraphNode) => {
+    // Optionally restart layout after drag
+    // layout.start()
 }
 
 // Render the complete graph
 const renderGraph = async () => {
-    if (!svgSelection || !containerGroupSelection) return
-
     isLoading.value = true
 
     try {
         await nextTick()
-
-        renderLinks()
-        renderNodes()
-        initializeSimulation()
+        initializeLayout()
     } finally {
         isLoading.value = false
     }
@@ -497,76 +319,56 @@ const renderGraph = async () => {
 
 // Public methods for external control
 const zoomToFit = () => {
-    if (!svgSelection || !zoomBehavior.value || props.nodes.length === 0) return
+    if (layout.nodes.value.length === 0) return
 
     const bounds = getBounds()
-    const fullWidth = props.width
-    const fullHeight = props.height
-    const width = bounds.width
-    const height = bounds.height
-    const midX = bounds.x + width / 2
-    const midY = bounds.y + height / 2
-
-    if (width === 0 || height === 0) return
-
-    const scale = Math.min(fullWidth / width, fullHeight / height) * 0.9
-    const translate = [fullWidth / 2 - scale * midX, fullHeight / 2 - scale * midY]
-
-    svgSelection
-        .transition()
-        .duration(750)
-        .call(zoomBehavior.value.transform, zoomIdentity.translate(translate[0], translate[1]).scale(scale))
+    zoom.zoomToFit(bounds, props.width, props.height)
 }
 
 const zoomToNode = (nodeId: string) => {
-    if (!svgSelection || !zoomBehavior.value) return
-
-    const node = props.nodes.find(n => n.id === nodeId)
+    const node = layout.nodes.value.find(n => n.id === nodeId)
     if (!node || node.x === undefined || node.y === undefined) return
 
+    const centerX = props.width / 2
+    const centerY = props.height / 2
     const scale = 2
-    const translate = [props.width / 2 - scale * node.x, props.height / 2 - scale * node.y]
+    const x = centerX - node.x * scale
+    const y = centerY - node.y * scale
 
-    svgSelection
-        .transition()
-        .duration(500)
-        .call(zoomBehavior.value.transform, zoomIdentity.translate(translate[0], translate[1]).scale(scale))
+    zoom.setTransform({ x, y, k: scale })
 }
 
 const resetZoom = () => {
-    if (!svgSelection || !zoomBehavior.value) return
-
-    svgSelection
-        .transition()
-        .duration(500)
-        .call(zoomBehavior.value.transform, zoomIdentity)
+    zoom.resetZoom()
 }
 
 const restartSimulation = () => {
-    if (forceLayout.value) {
-        forceLayout.value.start()
-    }
+    layout.start()
 }
 
 const stopSimulation = () => {
-    if (forceLayout.value) {
-        forceLayout.value.stop()
-    }
+    layout.stop()
 }
 
 const updateForceParameters = (options: Partial<ForceLayoutOptions>) => {
-    if (forceLayout.value) {
-        forceLayout.value.updateForces(options)
-    }
+    // Convert force options to native layout options
+    layout.updateOptions({
+        width: options.width ?? props.width,
+        height: options.height ?? props.height,
+        nodeSpacing: 80,
+        levelSpacing: 150,
+        centerForce: 0.1,
+        iterations: 300
+    })
 }
 
 const getLayoutStats = (): LayoutStats => {
-    return layoutStats.value
+    return layout.stats.value
 }
 
 // Get bounds of all nodes
 const getBounds = () => {
-    const nodes = props.nodes.filter(n => n.x !== undefined && n.y !== undefined)
+    const nodes = layout.nodes.value.filter(n => n.x !== undefined && n.y !== undefined)
     if (nodes.length === 0) return { x: 0, y: 0, width: 0, height: 0 }
 
     const xs = nodes.map(n => n.x!)
@@ -589,40 +391,18 @@ watch(() => [props.nodes, props.links], () => {
     renderGraph()
 }, { deep: true })
 
-watch(() => [props.selectedNodeId, props.highlightedNodes], () => {
-    renderNodes()
-    renderLinks()
-}, { deep: true })
-
 watch(() => selectedNodeId.value, (newSelectedId) => {
     if (newSelectedId) {
         // Highlight connected nodes when a node is selected
         highlightConnectedNodes(newSelectedId, props.links)
     }
-    renderNodes()
-    renderLinks()
 })
 
-watch(() => highlightedNodes.value, () => {
-    renderNodes()
-    renderLinks()
-}, { deep: true })
-
-watch(() => [graphSearch.highlightedGraphNodes.value, graphSearch.dimmedGraphNodes.value], () => {
-    renderNodes()
-    renderLinks()
-}, { deep: true })
-
-watch(() => props.forceOptions, () => {
-    if (forceLayout.value) {
-        forceLayout.value.updateForces(forceLayoutOptions.value)
-    }
-}, { deep: true })
-
 watch(() => [props.width, props.height], () => {
-    if (forceLayout.value) {
-        forceLayout.value.updateDimensions(props.width, props.height)
-    }
+    layout.updateOptions({
+        width: props.width,
+        height: props.height
+    })
 })
 
 // Event handlers for search integration
@@ -632,36 +412,37 @@ const handleCenterOnNode = (event: CustomEvent) => {
         zoomToNode(nodeId)
     } else {
         // Immediate center without animation
-        const node = props.nodes.find(n => n.id === nodeId)
+        const node = layout.nodes.value.find(n => n.id === nodeId)
         if (node && node.x !== undefined && node.y !== undefined) {
-            const scale = currentTransform.value.k
-            const translate = [props.width / 2 - scale * node.x, props.height / 2 - scale * node.y]
-
-            if (svgSelection && zoomBehavior.value) {
-                svgSelection.call(zoomBehavior.value.transform, zoomIdentity.translate(translate[0], translate[1]).scale(scale))
-            }
+            const scale = zoom.transform.value.k
+            const x = props.width / 2 - node.x * scale
+            const y = props.height / 2 - node.y * scale
+            zoom.setTransform({ x, y, k: scale })
         }
     }
 }
 
 // Lifecycle
 onMounted(() => {
-    initializeD3()
     renderGraph()
     keyboardNav.activate()
 
     // Listen for search-related events
     document.addEventListener('center-on-graph-node', handleCenterOnNode as EventListener)
+
+    // Add global mouse event listeners for zoom/pan
+    document.addEventListener('mousemove', zoom.handleMouseMove)
+    document.addEventListener('mouseup', zoom.handleMouseUp)
 })
 
 onUnmounted(() => {
-    if (forceLayout.value) {
-        forceLayout.value.dispose()
-    }
+    layout.stop()
     keyboardNav.deactivate()
 
     // Remove event listeners
     document.removeEventListener('center-on-graph-node', handleCenterOnNode as EventListener)
+    document.removeEventListener('mousemove', zoom.handleMouseMove)
+    document.removeEventListener('mouseup', zoom.handleMouseUp)
 })
 
 // Expose public methods

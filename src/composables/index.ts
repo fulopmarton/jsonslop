@@ -43,3 +43,16 @@ export type { GraphKeyboardNavigationOptions } from './useGraphKeyboardNavigatio
 // Graph Search composable
 export { useGraphSearch } from './useGraphSearch'
 export type { GraphSearchOptions, GraphSearchResult } from './useGraphSearch'
+
+// Native Layout composable
+export { useNativeLayout } from './useNativeLayout'
+export type { NativeLayoutOptions, UseNativeLayoutReturn } from './useNativeLayout'
+
+// Native Zoom composable
+export { useNativeZoom } from './useNativeZoom'
+export type {
+  ZoomTransform,
+  ZoomBounds,
+  UseNativeZoomOptions,
+  UseNativeZoomReturn,
+} from './useNativeZoom'

@@ -1,22 +1,6 @@
 // Graph data transformation utilities
 
-import type { JSONValue } from '@/types'
-
-export interface GraphNode {
-  id: string
-  key: string | number
-  value: unknown
-  type: 'object' | 'array' | 'string' | 'number' | 'boolean' | 'null'
-  path: string[]
-  x?: number
-  y?: number
-  fx?: number // Fixed position for dragging
-  fy?: number
-  children: string[] // Node IDs of children
-  parent?: string // Node ID of parent
-  depth: number
-  size: number // Visual size based on content
-}
+import type { JSONValue, GraphNode, NodeProperty } from '@/types'
 
 export interface GraphLink {
   source: string | GraphNode
@@ -95,6 +79,60 @@ export const calculateNodeSize = (value: unknown): number => {
 }
 
 /**
+ * Calculates the width of a rectangular node based on its properties
+ */
+export const calculateNodeWidth = (properties: NodeProperty[]): number => {
+  const minWidth = 120
+  const maxWidth = 300
+  const padding = 20
+
+  // Calculate width based on longest property text
+  let maxTextLength = 0
+  properties.forEach((prop) => {
+    const keyText = String(prop.key)
+    const valueText = formatPropertyValue(prop.value, prop.type)
+    const combinedLength = keyText.length + valueText.length + 3 // +3 for ": " separator
+    maxTextLength = Math.max(maxTextLength, combinedLength)
+  })
+
+  const calculatedWidth = Math.max(minWidth, Math.min(maxWidth, maxTextLength * 8 + padding))
+  return calculatedWidth
+}
+
+/**
+ * Calculates the height of a rectangular node based on its properties
+ */
+export const calculateNodeHeight = (properties: NodeProperty[]): number => {
+  const headerHeight = 24 // Height for node header (key/type)
+  const propertyHeight = 20 // Height per property row
+  const padding = 16 // Top and bottom padding
+
+  return headerHeight + properties.length * propertyHeight + padding
+}
+
+/**
+ * Formats a property value for display in the node
+ */
+export const formatPropertyValue = (value: any, type: NodeProperty['type']): string => {
+  switch (type) {
+    case 'string':
+      const str = String(value)
+      return str.length > 20 ? `"${str.substring(0, 20)}..."` : `"${str}"`
+    case 'number':
+    case 'boolean':
+      return String(value)
+    case 'null':
+      return 'null'
+    case 'object':
+      return '{...}'
+    case 'array':
+      return Array.isArray(value) ? `[${value.length}]` : '[...]'
+    default:
+      return String(value)
+  }
+}
+
+/**
  * Main class for building graph data from JSON
  */
 export class GraphBuilder {
@@ -128,6 +166,73 @@ export class GraphBuilder {
   ): void {
     const nodeId = pathToId(path)
     const key = path.length === 0 ? 'root' : path[path.length - 1]
+    const properties: NodeProperty[] = []
+    const children: string[] = []
+
+    // For objects and arrays, create properties for all key-value pairs
+    if (data !== null && typeof data === 'object') {
+      if (Array.isArray(data)) {
+        data.forEach((item, index) => {
+          const valueType = getDataType(item)
+          const isContainer = valueType === 'object' || valueType === 'array'
+
+          if (isContainer) {
+            // This property will connect to a child node
+            const childNodeId = [...path, String(index)].join('.')
+            properties.push({
+              key: index,
+              value: item,
+              type: valueType,
+              hasChildNode: true,
+              childNodeId,
+            })
+            children.push(childNodeId)
+          } else {
+            // This property is displayed inline (primitive value)
+            properties.push({
+              key: index,
+              value: item,
+              type: valueType,
+              hasChildNode: false,
+            })
+          }
+        })
+      } else {
+        Object.entries(data as Record<string, unknown>).forEach(([key, value]) => {
+          const valueType = getDataType(value)
+          const isContainer = valueType === 'object' || valueType === 'array'
+
+          if (isContainer) {
+            // This property will connect to a child node
+            const childNodeId = [...path, key].join('.')
+            properties.push({
+              key,
+              value,
+              type: valueType,
+              hasChildNode: true,
+              childNodeId,
+            })
+            children.push(childNodeId)
+          } else {
+            // This property is displayed inline (primitive value)
+            properties.push({
+              key,
+              value,
+              type: valueType,
+              hasChildNode: false,
+            })
+          }
+        })
+      }
+    } else {
+      // For primitive values, create a single property
+      properties.push({
+        key: key || 'value',
+        value: data,
+        type: getDataType(data),
+        hasChildNode: false,
+      })
+    }
 
     const node: GraphNode = {
       id: nodeId,
@@ -137,8 +242,13 @@ export class GraphBuilder {
       path: [...path],
       depth,
       size: calculateNodeSize(data),
-      children: [],
+      width: calculateNodeWidth(properties),
+      height: calculateNodeHeight(properties),
+      children,
       parent: parent?.id,
+      isExpanded: true,
+      hasChildren: children.length > 0,
+      properties,
     }
 
     nodes.push(node)
@@ -152,21 +262,23 @@ export class GraphBuilder {
         type: linkType,
         strength: this.calculateLinkStrength(linkType, depth),
       })
-      parent.children.push(nodeId)
+      // Don't add to parent.children here - it's already populated when the parent was created
     }
 
-    // Recursively process children
-    if (data !== null && typeof data === 'object') {
+    // Recursively process child nodes (only for container types)
+    children.forEach((childId) => {
+      const childPath = idToPath(childId)
+      const childKey = childPath[childPath.length - 1]
+      let childValue: unknown
+
       if (Array.isArray(data)) {
-        data.forEach((item, index) => {
-          this.traverse(item, [...path, String(index)], node, depth + 1, nodes, links)
-        })
-      } else {
-        Object.entries(data as Record<string, unknown>).forEach(([key, value]) => {
-          this.traverse(value, [...path, key], node, depth + 1, nodes, links)
-        })
+        childValue = data[parseInt(childKey)]
+      } else if (data && typeof data === 'object') {
+        childValue = (data as Record<string, unknown>)[childKey]
       }
-    }
+
+      this.traverse(childValue, childPath, node, depth + 1, nodes, links)
+    })
   }
 
   /**

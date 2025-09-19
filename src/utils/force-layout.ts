@@ -266,15 +266,25 @@ export class ForceLayout {
   /**
    * Handle simulation tick
    */
-  private handleTick = (nodes: GraphNode[]): void => {
+  private handleTick = (simulationNodes: GraphNode[], originalNodes: GraphNode[]): void => {
     this.stats.iterations++
     this.stats.alpha = this.simulation?.alpha() || 0
     this.stats.lastTickTime = performance.now()
 
+    // Sync positions from simulation nodes back to original nodes
+    simulationNodes.forEach((simNode, index) => {
+      if (originalNodes[index]) {
+        originalNodes[index].x = simNode.x
+        originalNodes[index].y = simNode.y
+        originalNodes[index].vx = simNode.vx
+        originalNodes[index].vy = simNode.vy
+      }
+    })
+
     this.updateFrameRate()
 
     // Check for convergence
-    if (this.checkConvergence(nodes)) {
+    if (this.checkConvergence(simulationNodes)) {
       this.stats.isConverged = true
       this.simulation?.stop()
     }
@@ -300,14 +310,20 @@ export class ForceLayout {
    * Initialize the force simulation
    */
   public initialize(nodes: GraphNode[], links: GraphLink[]): void {
+    console.log('ForceLayout: Initializing with', nodes.length, 'nodes and', links.length, 'links')
+
     // Stop existing simulation
     this.stop()
 
-    if (nodes.length === 0) return
+    if (nodes.length === 0) {
+      console.log('ForceLayout: No nodes provided, skipping initialization')
+      return
+    }
 
     // Get optimized parameters for this structure
     const optimizedOptions = this.getOptimizedParameters(nodes)
     this.options = optimizedOptions
+    console.log('ForceLayout: Using options:', this.options)
 
     // Reset stats
     this.stats = this.initializeStats()
@@ -354,8 +370,10 @@ export class ForceLayout {
       .alphaDecay(this.options.alphaDecay)
       .alphaMin(this.options.alphaMin)
       .velocityDecay(this.options.velocityDecay)
-      .on('tick', () => this.handleTick(simulationNodes))
+      .on('tick', () => this.handleTick(simulationNodes, nodes))
       .on('end', this.handleEnd)
+
+    console.log('ForceLayout: Simulation created, alpha:', this.simulation.alpha())
   }
 
   /**
@@ -397,15 +415,15 @@ export class ForceLayout {
       chargeForce.strength(this.options.chargeStrength)
     }
 
-    const centerForce = this.simulation.force('center') as any
+    const centerForce = this.simulation.force('center') as unknown
     if (centerForce) {
       centerForce.strength(this.options.centerStrength)
     }
 
-    const collisionForce = this.simulation.force('collision') as any
+    const collisionForce = this.simulation.force('collision') as unknown
     if (collisionForce) {
       collisionForce
-        .radius((d: any) => (d.size || 20) + this.options.collisionRadius)
+        .radius((d: unknown) => (d.size || 20) + this.options.collisionRadius)
         .strength(this.options.collisionStrength)
     }
 

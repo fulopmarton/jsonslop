@@ -75,50 +75,34 @@
   - Write tests for control functionality and layout switching
   - _Requirements: 4.3, 6.4_
 
-- [ ] 11. Implement performance optimizations for large datasets
+- [x] 11. Replace D3-based rendering with native SVG implementation
+  - Remove D3 dependencies from GraphCanvas and GraphNode components
+  - Implement native SVG rendering using Vue 3 reactive templates
+  - Replace D3 zoom/pan with custom Vue-based implementation
+  - Create native event handling for node interactions without D3
+  - Write tests for native SVG rendering and interaction handling
+  - _Requirements: 2.4, 4.3, 4.4_
+
+- [-] 12. Implement JSONCrack-style rectangular nodes
+  - Replace circular nodes with rectangular nodes containing all properties
+  - Display object properties as rows within node rectangles
+  - Show array indices and values within array nodes
+  - Add connection points on node edges for child relationships
+  - Implement proper text wrapping and node sizing
+  - Write tests for node content display and layout
+  - _Requirements: 2.1, 2.2, 2.5_
+
+- [ ] 13. Add hierarchical layout engine (JSONCrack style)
+  - Implement left-to-right hierarchical positioning algorithm
+  - Calculate proper spacing between nodes and levels
+  - Add support for vertical layout direction toggle
+  - Ensure nodes don't overlap and maintain readable spacing
+  - Write tests for layout calculations and positioning
+  - _Requirements: 4.1, 4.2, 4.4_
+
+- [ ] 14. Implement performance optimizations for large datasets
   - Add level-of-detail rendering that simplifies nodes when zoomed out
   - Implement node clustering for graphs with more than 100 nodes
   - Create virtual rendering system that only renders visible nodes
-  - Add Canvas fallback for very large graphs (1000+ nodes)
   - Write performance tests with large JSON files and measure rendering metrics
   - _Requirements: 6.1, 6.2, 6.3, 6.5_
-
-- [ ] 12. Add hierarchical and tree layout algorithms
-  - Implement D3 hierarchical layout with level-based positioning
-  - Create D3 tree layout with multiple orientation options
-  - Add smooth transitions when switching between layout algorithms
-  - Optimize layouts for different JSON structure patterns
-  - Write tests for layout algorithm correctness and visual quality
-  - _Requirements: 4.1, 4.2_
-
-- [ ] 13. Integrate graph view with existing app architecture
-  - Update main App.vue to include view toggle and graph view components
-  - Ensure graph view receives JSON data from existing store
-  - Maintain search and selection state consistency between views
-  - Add proper error handling and loading states for graph rendering
-  - Write integration tests for complete user workflows
-  - _Requirements: 1.1, 1.2, 1.4_
-
-- [ ] 14. Add responsive design and mobile support
-  - Implement touch-friendly interactions for mobile devices
-  - Add responsive layout adjustments for different screen sizes
-  - Create simplified controls and reduced visual complexity for mobile
-  - Ensure graph remains usable on tablets and small screens
-  - Write tests for responsive behavior and touch interactions
-  - _Requirements: 4.3, 6.5_
-
-- [ ] 15. Implement accessibility features
-  - Add ARIA labels and descriptions for graph nodes and relationships
-  - Create keyboard navigation system for graph exploration
-  - Implement focus management and visible focus indicators
-  - Add high contrast mode support for better visibility
-  - Write accessibility tests and screen reader compatibility tests
-  - _Requirements: 3.1, 3.2_
-
-- [ ] 16. Add final polish and optimization
-  - Optimize bundle size by implementing proper D3 tree-shaking
-  - Add smooth animations and transitions throughout the graph interface
-  - Implement proper cleanup of D3 simulations and event listeners
-  - Add comprehensive error boundaries and fallback states
-  - Perform final integration testing and bug fixes
-  - _Requirements: All requirements integration_

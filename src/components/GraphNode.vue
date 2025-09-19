@@ -1,24 +1,57 @@
 <template>
     <g ref="nodeElement" :class="nodeClasses" :transform="`translate(${node.x || 0}, ${node.y || 0})`"
         @click="handleClick" @dblclick="handleDoubleClick" @mouseenter="handleMouseEnter" @mouseleave="handleMouseLeave"
-        @contextmenu="handleContextMenu" @keydown="handleKeyDown" @focus="handleFocus" @blur="handleBlur" :tabindex="0"
-        role="button" :aria-label="`${node.type} node: ${node.key}`" :aria-selected="isSelected"
+        @contextmenu="handleContextMenu" @keydown="handleKeyDown" @focus="handleFocus" @blur="handleBlur"
+        @mousedown="handleMouseDown" :tabindex="0" role="button" :aria-label="`${node.type} node: ${node.key}`"
+        :aria-selected="isSelected"
         :aria-expanded="node.type === 'object' || node.type === 'array' ? 'true' : undefined">
-        <!-- Node background circle -->
-        <circle :r="nodeRadius" :fill="nodeFill" :stroke="nodeStroke" :stroke-width="strokeWidth"
-            class="node-background" />
 
-        <!-- Node icon/symbol based on type -->
-        <text :font-size="iconSize" text-anchor="middle" dominant-baseline="central" :fill="iconColor" class="node-icon"
-            dy="0.1em">
-            {{ nodeIcon }}
+        <!-- Node background rectangle -->
+        <rect :width="nodeWidth" :height="nodeHeight" :fill="nodeFill" :stroke="nodeStroke" :stroke-width="strokeWidth"
+            :rx="4" :ry="4" class="node-background" />
+
+        <!-- Node header -->
+        <rect :width="nodeWidth" :height="headerHeight" :fill="headerFill" :stroke="nodeStroke"
+            :stroke-width="strokeWidth" :rx="4" :ry="4" class="node-header" />
+
+        <!-- Node header text -->
+        <text :x="8" :y="headerHeight / 2" dominant-baseline="central" :font-size="headerFontSize"
+            :fill="headerTextColor" class="node-header-text" font-weight="600">
+            {{ nodeHeaderText }}
         </text>
 
-        <!-- Node label -->
-        <text v-if="showLabel" :x="0" :y="nodeRadius + 16" text-anchor="middle" :font-size="labelFontSize"
-            :fill="labelColor" class="node-label">
-            {{ nodeLabel }}
+        <!-- Node type badge -->
+        <text :x="nodeWidth - 8" :y="headerHeight / 2" text-anchor="end" dominant-baseline="central"
+            :font-size="typeFontSize" :fill="typeTextColor" class="node-type-badge">
+            {{ nodeTypeText }}
         </text>
+
+        <!-- Property rows -->
+        <g v-for="(property, index) in node.properties" :key="`${property.key}-${index}`"
+            :class="['property-row', { 'has-child': property.hasChildNode }]">
+
+            <!-- Property background (for hover effects) -->
+            <rect :x="0" :y="headerHeight + (index * propertyHeight)" :width="nodeWidth" :height="propertyHeight"
+                :fill="getPropertyBgColor(property, index)" class="property-background" />
+
+            <!-- Property key -->
+            <text :x="8" :y="headerHeight + (index * propertyHeight) + (propertyHeight / 2)" dominant-baseline="central"
+                :font-size="propertyFontSize" :fill="propertyKeyColor" class="property-key" font-weight="500">
+                {{ formatPropertyKey(property.key) }}:
+            </text>
+
+            <!-- Property value -->
+            <text :x="keyColumnWidth" :y="headerHeight + (index * propertyHeight) + (propertyHeight / 2)"
+                dominant-baseline="central" :font-size="propertyFontSize" :fill="getPropertyValueColor(property)"
+                class="property-value" :font-family="getPropertyValueFont(property)">
+                {{ formatPropertyValue(property.value, property.type) }}
+            </text>
+
+            <!-- Connection point for child nodes -->
+            <circle v-if="property.hasChildNode" :cx="nodeWidth"
+                :cy="headerHeight + (index * propertyHeight) + (propertyHeight / 2)" :r="3" :fill="connectionPointColor"
+                :stroke="nodeStroke" :stroke-width="1" class="connection-point" />
+        </g>
 
         <!-- Tooltip -->
         <foreignObject v-if="showTooltip" :x="tooltipX" :y="tooltipY" :width="tooltipWidth" :height="tooltipHeight"
@@ -26,33 +59,26 @@
             <div class="tooltip" xmlns="http://www.w3.org/1999/xhtml">
                 <div class="tooltip-header">
                     <span class="tooltip-key">{{ node.key }}</span>
-                    <span class="tooltip-type">{{ node.type }}</span>
+                    <span class="tooltip-type">{{ node.type.toUpperCase() }}</span>
                 </div>
                 <div class="tooltip-value">{{ tooltipValue }}</div>
                 <div class="tooltip-path">{{ node.path.join('.') || 'root' }}</div>
+                <div class="tooltip-properties">{{ node.properties.length }} properties</div>
             </div>
         </foreignObject>
     </g>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted } from 'vue'
-import { select, drag, type D3Selection, type D3DragBehavior } from '@/utils/d3-imports'
-import type { GraphNode } from '@/types'
-
-// D3 drag event type
-interface D3DragEvent {
-    x: number
-    y: number
-    active: number
-}
+import { computed, ref } from 'vue'
+import type { GraphNode, NodeProperty } from '@/types'
+import { formatPropertyValue } from '@/utils/graph-builder'
 
 interface Props {
     node: GraphNode
     isSelected?: boolean
     isHighlighted?: boolean
     showLabels?: boolean
-    simulation?: any // D3 simulation instance
 }
 
 interface Emits {
@@ -80,8 +106,14 @@ const showTooltip = ref(false)
 const isDragging = ref(false)
 const isFocused = ref(false)
 
-// DOM reference for D3 integration
+// DOM reference
 const nodeElement = ref<SVGGElement>()
+
+// Drag state
+let dragStartX = 0
+let dragStartY = 0
+let nodeStartX = 0
+let nodeStartY = 0
 
 // Computed properties for styling
 const nodeClasses = computed(() => [
@@ -96,96 +128,123 @@ const nodeClasses = computed(() => [
     },
 ])
 
-const nodeRadius = computed(() => {
-    const baseRadius = Math.max(8, Math.min(props.node.size, 30))
-    const selectedBonus = props.isSelected ? 4 : 0
-    const hoveredBonus = isHovered.value ? 2 : 0
-    return baseRadius + selectedBonus + hoveredBonus
-})
+// Node dimensions
+const nodeWidth = computed(() => props.node.width || 150)
+const nodeHeight = computed(() => props.node.height || 80)
+const headerHeight = computed(() => 24)
+const propertyHeight = computed(() => 20)
+const keyColumnWidth = computed(() => nodeWidth.value * 0.4)
+
+// Colors and styling
+const typeColors = {
+    object: '#4f46e5', // Indigo
+    array: '#059669', // Emerald
+    string: '#dc2626', // Red
+    number: '#ea580c', // Orange
+    boolean: '#7c3aed', // Violet
+    null: '#6b7280', // Gray
+}
 
 const nodeFill = computed(() => {
-    const typeColors = {
-        object: '#4f46e5', // Indigo
-        array: '#059669', // Emerald
-        string: '#dc2626', // Red
-        number: '#ea580c', // Orange
-        boolean: '#7c3aed', // Violet
-        null: '#6b7280', // Gray
-    }
+    const baseColor = '#ffffff'
+    if (props.isSelected) return '#f8fafc'
+    if (props.isHighlighted) return '#f1f5f9'
+    if (isHovered.value) return '#f8fafc'
+    return baseColor
+})
 
+const headerFill = computed(() => {
     const baseColor = typeColors[props.node.type]
-
-    if (props.isSelected) {
-        return baseColor
-    }
-
-    if (props.isHighlighted) {
-        return baseColor + 'dd' // Add transparency
-    }
-
-    if (isHovered.value) {
-        return baseColor + 'cc'
-    }
-
+    if (props.isSelected) return baseColor
+    if (props.isHighlighted) return baseColor + 'dd'
+    if (isHovered.value) return baseColor + 'cc'
     return baseColor + '99'
 })
 
 const nodeStroke = computed(() => {
-    if (props.isSelected) return '#1f2937'
+    if (props.isSelected) return typeColors[props.node.type]
     if (props.isHighlighted) return '#374151'
     if (isHovered.value) return '#4b5563'
-    return '#6b7280'
+    return '#d1d5db'
 })
 
 const strokeWidth = computed(() => {
-    if (props.isSelected) return 3
+    if (props.isSelected) return 2
     if (props.isHighlighted) return 2
-    if (isHovered.value) return 2
+    if (isHovered.value) return 1
     return 1
 })
 
-const nodeIcon = computed(() => {
-    const icons = {
-        object: '{}',
-        array: '[]',
-        string: '"',
-        number: '#',
-        boolean: '?',
-        null: '∅',
+// Header styling
+const nodeHeaderText = computed(() => {
+    const key = String(props.node.key)
+    return key.length > 15 ? key.substring(0, 15) + '...' : key
+})
+
+const nodeTypeText = computed(() => {
+    const typeLabels = {
+        object: 'OBJ',
+        array: 'ARR',
+        string: 'STR',
+        number: 'NUM',
+        boolean: 'BOOL',
+        null: 'NULL',
     }
-    return icons[props.node.type]
+    return typeLabels[props.node.type]
 })
 
-const iconSize = computed(() => {
-    return Math.max(10, nodeRadius.value * 0.6)
-})
+const headerFontSize = computed(() => 12)
+const typeFontSize = computed(() => 10)
+const propertyFontSize = computed(() => 11)
 
-const iconColor = computed(() => {
+const headerTextColor = computed(() => {
     return props.isSelected || isHovered.value ? '#ffffff' : '#f9fafb'
 })
 
-const showLabel = computed(() => {
-    return props.showLabels && !isDragging.value
+const typeTextColor = computed(() => {
+    return props.isSelected || isHovered.value ? '#ffffff' : '#e5e7eb'
 })
 
-const nodeLabel = computed(() => {
-    const key = String(props.node.key)
-    return key.length > 12 ? key.substring(0, 12) + '...' : key
-})
+const propertyKeyColor = computed(() => '#374151')
 
-const labelFontSize = computed(() => {
-    return Math.max(10, nodeRadius.value * 0.4)
-})
+const connectionPointColor = computed(() => typeColors[props.node.type])
 
-const labelColor = computed(() => {
-    return props.isSelected || props.isHighlighted ? '#1f2937' : '#4b5563'
-})
+// Helper functions
+const formatPropertyKey = (key: string | number): string => {
+    const keyStr = String(key)
+    return keyStr.length > 12 ? keyStr.substring(0, 12) + '...' : keyStr
+}
+
+const getPropertyValueColor = (property: NodeProperty): string => {
+    if (property.hasChildNode) return '#6b7280'
+
+    const colors = {
+        string: '#dc2626',
+        number: '#ea580c',
+        boolean: '#7c3aed',
+        null: '#6b7280',
+        object: '#4f46e5',
+        array: '#059669',
+    }
+    return colors[property.type]
+}
+
+const getPropertyValueFont = (property: NodeProperty): string => {
+    return property.type === 'string' || property.type === 'number' ? 'Monaco, Consolas, monospace' : 'system-ui, sans-serif'
+}
+
+const getPropertyBgColor = (property: NodeProperty, index: number): string => {
+    if (isHovered.value && hoveredPropertyIndex.value === index) {
+        return '#f3f4f6'
+    }
+    return 'transparent'
+}
 
 // Tooltip properties
-const tooltipX = computed(() => nodeRadius.value + 10)
-const tooltipY = computed(() => -nodeRadius.value - 10)
-const tooltipWidth = computed(() => 200)
-const tooltipHeight = computed(() => 80)
+const tooltipX = computed(() => nodeWidth.value + 10)
+const tooltipY = computed(() => -10)
+const tooltipWidth = computed(() => 220)
+const tooltipHeight = computed(() => 100)
 
 const tooltipValue = computed(() => {
     const value = props.node.value
@@ -202,6 +261,9 @@ const tooltipValue = computed(() => {
     }
     return String(value)
 })
+
+// Property hover state
+const hoveredPropertyIndex = ref<number | null>(null)
 
 // Event handlers
 const handleClick = (event: MouseEvent) => {
@@ -256,60 +318,53 @@ const handleBlur = () => {
     emit('blur', props.node)
 }
 
-// D3 drag behavior setup
-const setupDragBehavior = () => {
-    if (!nodeElement.value || !props.simulation) return
+const handleMouseDown = (event: MouseEvent) => {
+    if (event.button !== 0) return // Only left mouse button
 
-    const dragBehavior = drag()
-        .on('start', (event: D3DragEvent) => {
-            isDragging.value = true
-            showTooltip.value = false
-            emit('dragStart', props.node)
+    isDragging.value = true
+    showTooltip.value = false
 
-            if (!event.active) {
-                props.simulation.alphaTarget(0.3).restart()
-            }
+    // Store initial positions
+    dragStartX = event.clientX
+    dragStartY = event.clientY
+    nodeStartX = props.node.x || 0
+    nodeStartY = props.node.y || 0
 
-            // Fix the node position
-            props.node.fx = props.node.x
-            props.node.fy = props.node.y
-        })
-        .on('drag', (event: D3DragEvent) => {
-            // Update node position
-            props.node.fx = event.x
-            props.node.fy = event.y
-            emit('drag', props.node)
-        })
-        .on('end', (event: D3DragEvent) => {
-            isDragging.value = false
-            emit('dragEnd', props.node)
+    emit('dragStart', props.node)
 
-            if (!event.active) {
-                props.simulation.alphaTarget(0)
-            }
+    // Add global mouse event listeners
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
 
-            // Release the fixed position (allow simulation to take over)
-            props.node.fx = undefined
-            props.node.fy = undefined
-        })
-
-    // Apply drag behavior to the node element
-    select(nodeElement.value).call(dragBehavior)
+    event.preventDefault()
 }
 
-// Lifecycle hooks
-onMounted(() => {
-    if (props.simulation) {
-        setupDragBehavior()
-    }
-})
+const handleMouseMove = (event: MouseEvent) => {
+    if (!isDragging.value) return
 
-onUnmounted(() => {
-    // Clean up D3 event listeners
-    if (nodeElement.value) {
-        select(nodeElement.value).on('.drag', null)
-    }
-})
+    const deltaX = event.clientX - dragStartX
+    const deltaY = event.clientY - dragStartY
+
+    // Update node position
+    const newX = nodeStartX + deltaX
+    const newY = nodeStartY + deltaY
+
+    // Create a new node object to avoid prop mutation
+    const updatedNode = { ...props.node, x: newX, y: newY }
+    emit('drag', updatedNode)
+}
+
+const handleMouseUp = () => {
+    if (!isDragging.value) return
+
+    isDragging.value = false
+
+    // Remove global mouse event listeners
+    document.removeEventListener('mousemove', handleMouseMove)
+    document.removeEventListener('mouseup', handleMouseUp)
+
+    emit('dragEnd', props.node)
+}
 </script>
 
 <style scoped>
@@ -319,32 +374,72 @@ onUnmounted(() => {
 }
 
 .graph-node:hover {
-    filter: brightness(1.1);
+    filter: brightness(1.02);
 }
 
 .node-background {
     transition: all 0.2s ease;
 }
 
-.node-icon {
-    pointer-events: none;
-    font-family: 'Courier New', monospace;
-    font-weight: bold;
+.node-header {
+    transition: all 0.2s ease;
 }
 
-.node-label {
+.node-header-text {
     pointer-events: none;
     font-family: system-ui, -apple-system, sans-serif;
-    font-size: 11px;
-    font-weight: 500;
+    user-select: none;
+}
+
+.node-type-badge {
+    pointer-events: none;
+    font-family: system-ui, -apple-system, sans-serif;
+    font-weight: 600;
+    user-select: none;
+}
+
+.property-row {
+    transition: all 0.1s ease;
+}
+
+.property-background {
+    transition: all 0.1s ease;
+}
+
+.property-key {
+    pointer-events: none;
+    font-family: system-ui, -apple-system, sans-serif;
+    user-select: none;
+}
+
+.property-value {
+    pointer-events: none;
+    user-select: none;
+}
+
+.connection-point {
+    transition: all 0.2s ease;
+}
+
+.property-row.has-child .connection-point {
+    opacity: 0.8;
+}
+
+.property-row.has-child:hover .connection-point {
+    opacity: 1;
+    transform: scale(1.2);
 }
 
 .node-selected .node-background {
-    filter: drop-shadow(0 0 8px rgba(0, 0, 0, 0.3));
+    filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.15));
+}
+
+.node-selected .node-header {
+    filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.1));
 }
 
 .node-highlighted .node-background {
-    filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.2));
+    filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.1));
 }
 
 .node-dragging {
@@ -352,7 +447,7 @@ onUnmounted(() => {
 }
 
 .node-dragging .node-background {
-    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.2));
 }
 
 .node-focused {
@@ -373,12 +468,12 @@ onUnmounted(() => {
 .tooltip {
     background: rgba(0, 0, 0, 0.9);
     color: white;
-    padding: 8px 12px;
-    border-radius: 6px;
+    padding: 10px 14px;
+    border-radius: 8px;
     font-size: 12px;
     font-family: system-ui, -apple-system, sans-serif;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    max-width: 180px;
+    max-width: 200px;
     word-wrap: break-word;
 }
 
@@ -386,13 +481,13 @@ onUnmounted(() => {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 4px;
+    margin-bottom: 6px;
     font-weight: 600;
 }
 
 .tooltip-key {
     color: #fbbf24;
-    font-family: 'Courier New', monospace;
+    font-family: 'Monaco', 'Consolas', monospace;
 }
 
 .tooltip-type {
@@ -405,7 +500,7 @@ onUnmounted(() => {
 .tooltip-value {
     color: #e5e7eb;
     margin-bottom: 4px;
-    font-family: 'Courier New', monospace;
+    font-family: 'Monaco', 'Consolas', monospace;
     font-size: 11px;
 }
 
@@ -413,31 +508,49 @@ onUnmounted(() => {
     color: #9ca3af;
     font-size: 10px;
     font-style: italic;
+    margin-bottom: 4px;
+}
+
+.tooltip-properties {
+    color: #9ca3af;
+    font-size: 10px;
 }
 
 /* Type-specific styling */
-.node-type-object .node-background {
-    stroke-dasharray: none;
+.node-type-object .node-header {
+    /* Object nodes have solid headers */
 }
 
-.node-type-array .node-background {
-    stroke-dasharray: 3, 2;
+.node-type-array .node-header {
+    /* Array nodes have slightly different styling */
+    opacity: 0.95;
 }
 
-.node-type-string .node-background {
-    stroke-dasharray: none;
-}
-
-.node-type-number .node-background {
-    stroke-dasharray: none;
-}
-
+.node-type-string .node-background,
+.node-type-number .node-background,
 .node-type-boolean .node-background {
-    stroke-dasharray: 1, 1;
+    /* Primitive nodes have simpler styling */
 }
 
 .node-type-null .node-background {
-    stroke-dasharray: 5, 5;
+    opacity: 0.8;
+}
+
+.node-type-null .node-header {
     opacity: 0.7;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+
+    .node-header-text,
+    .property-key,
+    .property-value {
+        font-size: 10px;
+    }
+
+    .node-type-badge {
+        font-size: 9px;
+    }
 }
 </style>

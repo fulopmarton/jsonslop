@@ -145,71 +145,55 @@ describe('Graph Builder Utilities', () => {
         const data = { name: 'John', age: 30 }
         const result = GraphBuilder.buildGraph(data)
 
-        expect(result.nodes).toHaveLength(3) // root + 2 properties
-        expect(result.links).toHaveLength(2)
+        expect(result.nodes).toHaveLength(1) // Only root node (primitives are inline)
+        expect(result.links).toHaveLength(0) // No links for primitive properties
 
         // Check root node
         const rootNode = result.nodes.find((n) => n.id === 'root')!
         expect(rootNode.type).toBe('object')
-        expect(rootNode.children).toHaveLength(2)
-        expect(rootNode.children).toContain('name')
-        expect(rootNode.children).toContain('age')
+        expect(rootNode.children).toHaveLength(0) // No child nodes for primitives
+        expect(rootNode.properties).toHaveLength(2) // Properties are inline
 
-        // Check property nodes
-        const nameNode = result.nodes.find((n) => n.id === 'name')!
-        expect(nameNode.value).toBe('John')
-        expect(nameNode.type).toBe('string')
-        expect(nameNode.parent).toBe('root')
-        expect(nameNode.path).toEqual(['name'])
-        expect(nameNode.depth).toBe(1)
+        // Check properties are inline
+        const nameProperty = rootNode.properties.find((p) => p.key === 'name')!
+        expect(nameProperty.value).toBe('John')
+        expect(nameProperty.type).toBe('string')
+        expect(nameProperty.hasChildNode).toBe(false)
 
-        const ageNode = result.nodes.find((n) => n.id === 'age')!
-        expect(ageNode.value).toBe(30)
-        expect(ageNode.type).toBe('number')
-        expect(ageNode.parent).toBe('root')
-        expect(ageNode.path).toEqual(['age'])
-        expect(ageNode.depth).toBe(1)
-
-        // Check links
-        expect(result.links).toEqual([
-          {
-            source: 'root',
-            target: 'name',
-            type: 'parent-child',
-            strength: 0.9, // 1.0 * (1 - 1 * 0.1)
-          },
-          {
-            source: 'root',
-            target: 'age',
-            type: 'parent-child',
-            strength: 0.9, // 1.0 * (1 - 1 * 0.1)
-          },
-        ])
+        const ageProperty = rootNode.properties.find((p) => p.key === 'age')!
+        expect(ageProperty.value).toBe(30)
+        expect(ageProperty.type).toBe('number')
+        expect(ageProperty.hasChildNode).toBe(false)
       })
 
       it('should build graph for simple array', () => {
         const data = ['apple', 'banana', 'cherry']
         const result = GraphBuilder.buildGraph(data)
 
-        expect(result.nodes).toHaveLength(4) // root + 3 items
-        expect(result.links).toHaveLength(3)
+        expect(result.nodes).toHaveLength(1) // Only root node (primitive values are inline)
+        expect(result.links).toHaveLength(0) // No links since primitives are inline
 
         // Check root node
         const rootNode = result.nodes.find((n) => n.id === 'root')!
         expect(rootNode.type).toBe('array')
-        expect(rootNode.children).toEqual(['0', '1', '2'])
+        expect(rootNode.children).toEqual([]) // No child nodes for primitive values
+        expect(rootNode.properties).toHaveLength(3) // All array items as properties
 
-        // Check array item nodes
-        const item0 = result.nodes.find((n) => n.id === '0')!
-        expect(item0.value).toBe('apple')
-        expect(item0.key).toBe('0')
-        expect(item0.path).toEqual(['0'])
-        expect(item0.parent).toBe('root')
+        // Check array item properties (displayed inline)
+        const prop0 = rootNode.properties.find((p) => p.key === 0)!
+        expect(prop0.value).toBe('apple')
+        expect(prop0.type).toBe('string')
+        expect(prop0.hasChildNode).toBe(false)
 
-        // Check array-item link type
-        const link0 = result.links.find((l) => l.target === '0')!
-        expect(link0.type).toBe('array-item')
-        expect(link0.strength).toBeCloseTo(0.72) // 0.8 * (1 - 1 * 0.1)
+        const prop1 = rootNode.properties.find((p) => p.key === 1)!
+        expect(prop1.value).toBe('banana')
+        expect(prop1.type).toBe('string')
+        expect(prop1.hasChildNode).toBe(false)
+
+        const prop2 = rootNode.properties.find((p) => p.key === 2)!
+        expect(prop2.value).toBe('cherry')
+        expect(prop2.type).toBe('string')
+        expect(prop2.hasChildNode).toBe(false)
       })
 
       it('should build graph for nested structures', () => {
@@ -222,27 +206,52 @@ describe('Graph Builder Utilities', () => {
         }
         const result = GraphBuilder.buildGraph(data)
 
-        expect(result.nodes).toHaveLength(7) // root + user + name + hobbies + 2 hobby items + count
-        expect(result.links).toHaveLength(6)
+        expect(result.nodes).toHaveLength(3) // root + user + hobbies (primitives are inline)
+        expect(result.links).toHaveLength(2) // root->user, user->hobbies
 
-        // Check nested object
+        // Check root node
+        const rootNode = result.nodes.find((n) => n.id === 'root')!
+        expect(rootNode.type).toBe('object')
+        expect(rootNode.children).toEqual(['user']) // Only container children
+        expect(rootNode.properties).toHaveLength(2) // user (child) + count (inline)
+
+        const userProp = rootNode.properties.find((p) => p.key === 'user')!
+        expect(userProp.hasChildNode).toBe(true)
+        expect(userProp.childNodeId).toBe('user')
+
+        const countProp = rootNode.properties.find((p) => p.key === 'count')!
+        expect(countProp.value).toBe(42)
+        expect(countProp.hasChildNode).toBe(false)
+
+        // Check user node
         const userNode = result.nodes.find((n) => n.id === 'user')!
         expect(userNode.type).toBe('object')
-        expect(userNode.depth).toBe(1)
-        expect(userNode.children).toContain('user.name')
-        expect(userNode.children).toContain('user.hobbies')
+        expect(userNode.parent).toBe('root')
+        expect(userNode.children).toEqual(['user.hobbies']) // Only container children
+        expect(userNode.properties).toHaveLength(2) // name (inline) + hobbies (child)
 
-        // Check nested array
+        const nameProp = userNode.properties.find((p) => p.key === 'name')!
+        expect(nameProp.value).toBe('John')
+        expect(nameProp.hasChildNode).toBe(false)
+
+        const hobbiesProp = userNode.properties.find((p) => p.key === 'hobbies')!
+        expect(hobbiesProp.hasChildNode).toBe(true)
+        expect(hobbiesProp.childNodeId).toBe('user.hobbies')
+
+        // Check hobbies array node
         const hobbiesNode = result.nodes.find((n) => n.id === 'user.hobbies')!
         expect(hobbiesNode.type).toBe('array')
-        expect(hobbiesNode.depth).toBe(2)
-        expect(hobbiesNode.children).toEqual(['user.hobbies.0', 'user.hobbies.1'])
+        expect(hobbiesNode.parent).toBe('user')
+        expect(hobbiesNode.children).toEqual([]) // No child nodes for primitive array items
+        expect(hobbiesNode.properties).toHaveLength(2) // Both array items as inline properties
 
-        // Check deeply nested items
-        const hobby0 = result.nodes.find((n) => n.id === 'user.hobbies.0')!
-        expect(hobby0.value).toBe('reading')
-        expect(hobby0.depth).toBe(3)
-        expect(hobby0.path).toEqual(['user', 'hobbies', '0'])
+        const hobby0Prop = hobbiesNode.properties.find((p) => p.key === 0)!
+        expect(hobby0Prop.value).toBe('reading')
+        expect(hobby0Prop.hasChildNode).toBe(false)
+
+        const hobby1Prop = hobbiesNode.properties.find((p) => p.key === 1)!
+        expect(hobby1Prop.value).toBe('coding')
+        expect(hobby1Prop.hasChildNode).toBe(false)
       })
 
       it('should handle complex nested arrays and objects', () => {
@@ -252,25 +261,43 @@ describe('Graph Builder Utilities', () => {
         ]
         const result = GraphBuilder.buildGraph(data)
 
-        // Should have: root + 2 objects + 2 id fields + 2 tag arrays + 3 tag strings = 10 nodes
-        expect(result.nodes).toHaveLength(10)
-        expect(result.links).toHaveLength(9)
+        // Should have: root + 2 objects + 2 tag arrays = 5 nodes (primitives are inline)
+        expect(result.nodes).toHaveLength(5)
+        expect(result.links).toHaveLength(4) // root->obj1, root->obj2, obj1->tags1, obj2->tags2
 
         // Check array structure
         const rootNode = result.nodes.find((n) => n.id === 'root')!
         expect(rootNode.type).toBe('array')
-        expect(rootNode.children).toEqual(['0', '1'])
+        expect(rootNode.children).toEqual(['0', '1']) // Two object children
+        expect(rootNode.properties).toHaveLength(2) // Two array items as properties
 
-        // Check nested object in array
-        const obj0 = result.nodes.find((n) => n.id === '0')!
-        expect(obj0.type).toBe('object')
-        expect(obj0.children).toContain('0.id')
-        expect(obj0.children).toContain('0.tags')
+        // Check first object
+        const obj1 = result.nodes.find((n) => n.id === '0')!
+        expect(obj1.type).toBe('object')
+        expect(obj1.children).toEqual(['0.tags']) // Only tags array as child
+        expect(obj1.properties).toHaveLength(2) // id (inline) + tags (child)
 
-        // Check nested array in object
-        const tags0 = result.nodes.find((n) => n.id === '0.tags')!
-        expect(tags0.type).toBe('array')
-        expect(tags0.children).toEqual(['0.tags.0', '0.tags.1'])
+        const idProp1 = obj1.properties.find((p) => p.key === 'id')!
+        expect(idProp1.value).toBe(1)
+        expect(idProp1.hasChildNode).toBe(false)
+
+        const tagsProp1 = obj1.properties.find((p) => p.key === 'tags')!
+        expect(tagsProp1.hasChildNode).toBe(true)
+        expect(tagsProp1.childNodeId).toBe('0.tags')
+
+        // Check first tags array
+        const tags1 = result.nodes.find((n) => n.id === '0.tags')!
+        expect(tags1.type).toBe('array')
+        expect(tags1.children).toEqual([]) // No child nodes for primitive array items
+        expect(tags1.properties).toHaveLength(2) // Both tag strings as inline properties
+
+        const tag1Prop = tags1.properties.find((p) => p.key === 0)!
+        expect(tag1Prop.value).toBe('tag1')
+        expect(tag1Prop.hasChildNode).toBe(false)
+
+        const tag2Prop = tags1.properties.find((p) => p.key === 1)!
+        expect(tag2Prop.value).toBe('tag2')
+        expect(tag2Prop.hasChildNode).toBe(false)
       })
 
       it('should calculate link strength based on depth', () => {
@@ -284,6 +311,7 @@ describe('Graph Builder Utilities', () => {
         const result = GraphBuilder.buildGraph(data)
 
         const links = result.links
+        expect(links).toHaveLength(2) // Only 2 links since level3 is primitive (inline)
 
         // Level 1 link (depth 1)
         const level1Link = links.find((l) => l.target === 'level1')!
@@ -293,9 +321,11 @@ describe('Graph Builder Utilities', () => {
         const level2Link = links.find((l) => l.target === 'level1.level2')!
         expect(level2Link.strength).toBe(0.8) // 1.0 * (1 - 2 * 0.1)
 
-        // Level 3 link (depth 3)
-        const level3Link = links.find((l) => l.target === 'level1.level2.level3')!
-        expect(level3Link.strength).toBe(0.7) // 1.0 * (1 - 3 * 0.1)
+        // Level 3 is primitive, so it's inline in level2 node, no separate link
+        const level2Node = result.nodes.find((n) => n.id === 'level1.level2')!
+        const level3Prop = level2Node.properties.find((p) => p.key === 'level3')!
+        expect(level3Prop.value).toBe('deep')
+        expect(level3Prop.hasChildNode).toBe(false)
       })
 
       it('should handle edge cases with special values', () => {
@@ -309,22 +339,50 @@ describe('Graph Builder Utilities', () => {
         }
         const result = GraphBuilder.buildGraph(data)
 
-        expect(result.nodes).toHaveLength(7) // root + 6 properties
+        expect(result.nodes).toHaveLength(3) // root + emptyArray + emptyObject (primitives are inline)
 
-        const nullNode = result.nodes.find((n) => n.id === 'nullValue')!
-        expect(nullNode.type).toBe('null')
-        expect(nullNode.value).toBe(null)
+        const rootNode = result.nodes.find((n) => n.id === 'root')!
+        expect(rootNode.properties).toHaveLength(6) // All 6 properties
 
-        const emptyStringNode = result.nodes.find((n) => n.id === 'emptyString')!
-        expect(emptyStringNode.type).toBe('string')
-        expect(emptyStringNode.value).toBe('')
+        // Check primitive properties (inline)
+        const nullProp = rootNode.properties.find((p) => p.key === 'nullValue')!
+        expect(nullProp.type).toBe('null')
+        expect(nullProp.value).toBe(null)
+        expect(nullProp.hasChildNode).toBe(false)
 
+        const emptyStringProp = rootNode.properties.find((p) => p.key === 'emptyString')!
+        expect(emptyStringProp.type).toBe('string')
+        expect(emptyStringProp.value).toBe('')
+        expect(emptyStringProp.hasChildNode).toBe(false)
+
+        const zeroProp = rootNode.properties.find((p) => p.key === 'zero')!
+        expect(zeroProp.type).toBe('number')
+        expect(zeroProp.value).toBe(0)
+        expect(zeroProp.hasChildNode).toBe(false)
+
+        const falseProp = rootNode.properties.find((p) => p.key === 'false')!
+        expect(falseProp.type).toBe('boolean')
+        expect(falseProp.value).toBe(false)
+        expect(falseProp.hasChildNode).toBe(false)
+
+        // Check container properties (have child nodes)
+        const emptyArrayProp = rootNode.properties.find((p) => p.key === 'emptyArray')!
+        expect(emptyArrayProp.hasChildNode).toBe(true)
+        expect(emptyArrayProp.childNodeId).toBe('emptyArray')
+
+        const emptyObjectProp = rootNode.properties.find((p) => p.key === 'emptyObject')!
+        expect(emptyObjectProp.hasChildNode).toBe(true)
+        expect(emptyObjectProp.childNodeId).toBe('emptyObject')
+
+        // Check empty container nodes
         const emptyArrayNode = result.nodes.find((n) => n.id === 'emptyArray')!
         expect(emptyArrayNode.type).toBe('array')
+        expect(emptyArrayNode.properties).toHaveLength(0)
         expect(emptyArrayNode.children).toEqual([])
 
         const emptyObjectNode = result.nodes.find((n) => n.id === 'emptyObject')!
         expect(emptyObjectNode.type).toBe('object')
+        expect(emptyObjectNode.properties).toHaveLength(0)
         expect(emptyObjectNode.children).toEqual([])
       })
     })
@@ -349,14 +407,20 @@ describe('Graph Builder Utilities', () => {
       it('should build subgraph from specific path', () => {
         const result = GraphBuilder.buildSubgraph(testData, ['users'])
 
-        // Should include users array and all its descendants
+        // Should include users array and all its descendants (only container nodes)
         const userIds = result.nodes.map((n) => n.id)
         expect(userIds).toContain('users')
         expect(userIds).toContain('users.0')
+        expect(userIds).toContain('users.1')
         expect(userIds).toContain('users.0.profile')
-        expect(userIds).toContain('users.0.profile.age')
+        expect(userIds).toContain('users.1.profile')
         expect(userIds).not.toContain('settings') // Should not include siblings
         expect(userIds).not.toContain('root') // Should not include parent
+
+        // Primitive values like age, city, name, id are inline properties, not separate nodes
+        expect(userIds).not.toContain('users.0.profile.age')
+        expect(userIds).not.toContain('users.0.name')
+        expect(userIds).not.toContain('users.0.id')
       })
 
       it('should return empty graph for non-existent path', () => {
@@ -367,12 +431,12 @@ describe('Graph Builder Utilities', () => {
       })
 
       it('should build subgraph for leaf node', () => {
+        // In JSONCrack style, primitive values don't have separate nodes
+        // So trying to build a subgraph from a primitive path should return empty
         const result = GraphBuilder.buildSubgraph(testData, ['users', '0', 'name'])
 
-        expect(result.nodes).toHaveLength(1)
+        expect(result.nodes).toHaveLength(0)
         expect(result.links).toHaveLength(0)
-        expect(result.nodes[0].id).toBe('users.0.name')
-        expect(result.nodes[0].value).toBe('John')
       })
     })
 
@@ -404,16 +468,16 @@ describe('Graph Builder Utilities', () => {
         const graph = GraphBuilder.buildGraph(data)
         const stats = GraphBuilder.getGraphStats(graph)
 
-        expect(stats.nodeCount).toBe(9) // root + users + 2 names + settings + theme + enabled + count + data
-        expect(stats.linkCount).toBe(8)
-        expect(stats.maxDepth).toBe(2)
+        expect(stats.nodeCount).toBe(3) // root + users + settings (primitives are inline)
+        expect(stats.linkCount).toBe(2) // root->users, root->settings
+        expect(stats.maxDepth).toBe(1) // Only 2 levels: root (0) and children (1)
         expect(stats.nodesByType.object).toBe(2) // root + settings
         expect(stats.nodesByType.array).toBe(1) // users
-        expect(stats.nodesByType.string).toBe(3) // John + Jane + dark
-        expect(stats.nodesByType.number).toBe(1) // 42
-        expect(stats.nodesByType.boolean).toBe(1) // true
-        expect(stats.nodesByType.null).toBe(1) // null
-        expect(stats.avgChildrenPerNode).toBeCloseTo(8 / 9) // 8 total children / 9 nodes
+        expect(stats.nodesByType.string).toBe(0) // Primitives don't create separate nodes
+        expect(stats.nodesByType.number).toBe(0) // Primitives don't create separate nodes
+        expect(stats.nodesByType.boolean).toBe(0) // Primitives don't create separate nodes
+        expect(stats.nodesByType.null).toBe(0) // Primitives don't create separate nodes
+        expect(stats.avgChildrenPerNode).toBeCloseTo(4 / 3) // 4 total children / 3 nodes (root has 2, users has 0, settings has 0, but we count all children arrays)
       })
     })
   })

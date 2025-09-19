@@ -36,6 +36,14 @@ export interface JSONObject {
 export interface JSONArray extends Array<JSONValue> {}
 
 // Graph-related types
+export interface NodeProperty {
+  key: string | number
+  value: any
+  type: 'object' | 'array' | 'string' | 'number' | 'boolean' | 'null'
+  hasChildNode: boolean // True if this property connects to a child node
+  childNodeId?: string // ID of connected child node if hasChildNode is true
+}
+
 export interface GraphNode {
   id: string
   key: string | number
@@ -44,6 +52,8 @@ export interface GraphNode {
   path: string[]
   x?: number
   y?: number
+  width?: number // Width of rectangular node
+  height?: number // Height of rectangular node
   vx?: number // Velocity x for simulation
   vy?: number // Velocity y for simulation
   fx?: number // Fixed position for dragging
@@ -52,6 +62,9 @@ export interface GraphNode {
   parent?: string // Node ID of parent
   depth: number
   size: number // Visual size based on content
+  isExpanded: boolean
+  hasChildren: boolean
+  properties: NodeProperty[] // All key-value pairs displayed in this node
 }
 
 export interface GraphLink {

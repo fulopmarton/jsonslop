@@ -208,8 +208,17 @@ export const useJsonStore = defineStore('json', () => {
 
           // Build graph structure
           const graphData = GraphBuilder.buildGraph(parseResult.data)
+          console.log(
+            'Built graph:',
+            graphData.nodes.length,
+            'nodes,',
+            graphData.links.length,
+            'links',
+          )
+          if (graphData.links.length > 0) {
+            console.log('First few links:', graphData.links.slice(0, 3))
+          }
           updateGraphData(graphData)
-          console.log('Built graph:', graphData) // Debug log
 
           // Auto-expand nodes based on preferences
           autoExpandNodes()
