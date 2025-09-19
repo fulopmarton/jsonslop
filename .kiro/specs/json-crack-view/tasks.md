@@ -95,7 +95,6 @@
 - [ ] 13. Add hierarchical layout engine (JSONCrack style)
   - Implement left-to-right hierarchical positioning algorithm
   - Calculate proper spacing between nodes and levels
-  - Add support for vertical layout direction toggle
   - Ensure nodes don't overlap and maintain readable spacing
   - Write tests for layout calculations and positioning
   - _Requirements: 4.1, 4.2, 4.4_

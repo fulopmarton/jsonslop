@@ -15,12 +15,11 @@
             <g class="zoom-container" :transform="zoom.transformString.value">
                 <!-- Links -->
                 <g class="links-group">
-                    <line v-for="link in layout.links.value"
-                        :key="`${getNodeId(link.source)}-${getNodeId(link.target)}`" class="link"
-                        :x1="getNodeX(link.source)" :y1="getNodeY(link.source)" :x2="getNodeX(link.target)"
-                        :y2="getNodeY(link.target)" :stroke="getLinkStroke(link)"
-                        :stroke-width="getLinkStrokeWidth(link)" :opacity="getLinkOpacity(link)"
-                        marker-end="url(#arrowhead)" @click="handleLinkClick(link, $event)" />
+                    <path v-for="link in layout.links.value"
+                        :key="`${getNodeId(link.source)}-${getNodeId(link.target)}`" class="link" :d="getLinkPath(link)"
+                        :stroke="getLinkStroke(link)" :stroke-width="getLinkStrokeWidth(link)"
+                        :opacity="getLinkOpacity(link)" fill="none" marker-end="url(#arrowhead)"
+                        @click="handleLinkClick(link, $event)" />
                 </g>
 
                 <!-- Nodes -->
@@ -57,6 +56,7 @@ import GraphNodeComponent from './GraphNode.vue'
 import { useGraphInteractions } from '@/composables/useGraphInteractions'
 import { useGraphKeyboardNavigation } from '@/composables/useGraphKeyboardNavigation'
 import { useGraphSearch } from '@/composables/useGraphSearch'
+import { calculateLinkPath } from '@/utils/link-paths'
 
 // Props
 interface Props {
@@ -252,6 +252,28 @@ const getLinkOpacity = (link: GraphLink): number => {
         return 0.3 // Dim non-connected links when a node is selected
     }
     return 1
+}
+
+const getLinkPath = (link: GraphLink): string => {
+    const linkPath = calculateLinkPath(link, layout.nodes.value, {
+        nodeWidth: 160,
+        nodeHeight: 80,
+        headerHeight: 24,
+        propertyHeight: 20,
+        curvature: 0.4
+    })
+
+    if (linkPath) {
+        return linkPath.path
+    }
+
+    // Fallback to straight line if path calculation fails
+    const sourceX = getNodeX(link.source)
+    const sourceY = getNodeY(link.source)
+    const targetX = getNodeX(link.target)
+    const targetY = getNodeY(link.target)
+
+    return `M ${sourceX} ${sourceY} L ${targetX} ${targetY}`
 }
 
 // Event handlers

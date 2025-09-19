@@ -29,6 +29,11 @@ describe('useNativeLayout', () => {
       children: ['node2', 'node3'],
       depth: 0,
       size: 20,
+      width: 160,
+      height: 80,
+      isExpanded: true,
+      hasChildren: true,
+      properties: [],
     },
     {
       id: 'node2',
@@ -40,6 +45,11 @@ describe('useNativeLayout', () => {
       parent: 'node1',
       depth: 1,
       size: 15,
+      width: 140,
+      height: 60,
+      isExpanded: true,
+      hasChildren: false,
+      properties: [],
     },
     {
       id: 'node3',
@@ -51,6 +61,11 @@ describe('useNativeLayout', () => {
       parent: 'node1',
       depth: 1,
       size: 15,
+      width: 140,
+      height: 60,
+      isExpanded: true,
+      hasChildren: false,
+      properties: [],
     },
   ]
 
@@ -91,7 +106,7 @@ describe('useNativeLayout', () => {
   })
 
   it('should initialize layout with nodes and links', () => {
-    const layout = useNativeLayout()
+    const layout = useNativeLayout({ layoutType: 'hierarchical' })
     const nodes = createMockNodes()
     const links = createMockLinks()
 
@@ -100,14 +115,30 @@ describe('useNativeLayout', () => {
     expect(layout.nodes.value).toHaveLength(3)
     expect(layout.links.value).toEqual(links)
     expect(layout.stats.value.iterations).toBe(0)
-    expect(layout.stats.value.alpha).toBe(1)
+    expect(layout.stats.value.alpha).toBe(0) // Hierarchical layout is immediately converged
+    expect(layout.stats.value.isConverged).toBe(true)
+  })
+
+  it('should initialize force layout with nodes and links', () => {
+    const layout = useNativeLayout({ layoutType: 'force' })
+    const nodes = createMockNodes()
+    const links = createMockLinks()
+
+    layout.initialize(nodes, links)
+
+    expect(layout.nodes.value).toHaveLength(3)
+    expect(layout.links.value).toEqual(links)
+    expect(layout.stats.value.iterations).toBe(0)
+    expect(layout.stats.value.alpha).toBe(1) // Force layout starts with alpha = 1
+    expect(layout.stats.value.isConverged).toBe(false)
   })
 
   it('should position nodes hierarchically', () => {
     const layout = useNativeLayout({
       width: 800,
       height: 600,
-      levelSpacing: 150,
+      levelSpacing: 200,
+      layoutType: 'hierarchical',
     })
     const nodes = createMockNodes()
     const links = createMockLinks()
@@ -116,17 +147,17 @@ describe('useNativeLayout', () => {
 
     // Root node should be at depth 0
     const rootNode = layout.nodes.value.find((n) => n.id === 'node1')
-    expect(rootNode?.x).toBe(100) // First level position
+    expect(rootNode?.x).toBe(50) // padding.left
     expect(rootNode?.y).toBeDefined()
 
     // Child nodes should be at depth 1
     const childNode = layout.nodes.value.find((n) => n.id === 'node2')
-    expect(childNode?.x).toBe(250) // Second level position (100 + 150)
+    expect(childNode?.x).toBe(250) // padding.left + levelSpacing (50 + 200)
     expect(childNode?.y).toBeDefined()
   })
 
-  it('should start and stop layout animation', () => {
-    const layout = useNativeLayout()
+  it('should start and stop layout animation for force layout', () => {
+    const layout = useNativeLayout({ layoutType: 'force' })
     const nodes = createMockNodes()
     const links = createMockLinks()
 
@@ -141,8 +172,22 @@ describe('useNativeLayout', () => {
     expect(layout.isRunning.value).toBe(false)
   })
 
-  it('should call tick callbacks during animation', async () => {
-    const layout = useNativeLayout({ iterations: 5 })
+  it('should not animate for hierarchical layout', () => {
+    const layout = useNativeLayout({ layoutType: 'hierarchical' })
+    const nodes = createMockNodes()
+    const links = createMockLinks()
+
+    layout.initialize(nodes, links)
+
+    expect(layout.isRunning.value).toBe(false)
+    expect(layout.stats.value.isConverged).toBe(true)
+
+    layout.start()
+    expect(layout.isRunning.value).toBe(false) // Should remain false for hierarchical
+  })
+
+  it('should call tick callbacks during force animation', async () => {
+    const layout = useNativeLayout({ iterations: 5, layoutType: 'force' })
     const tickCallback = vi.fn()
     const nodes = createMockNodes()
     const links = createMockLinks()
@@ -160,8 +205,8 @@ describe('useNativeLayout', () => {
     expect(tickCallback).toHaveBeenCalled()
   })
 
-  it('should call end callbacks when animation completes', async () => {
-    const layout = useNativeLayout({ iterations: 2 })
+  it('should call end callbacks when force animation completes', async () => {
+    const layout = useNativeLayout({ iterations: 2, layoutType: 'force' })
     const endCallback = vi.fn()
     const nodes = createMockNodes()
     const links = createMockLinks()
@@ -175,6 +220,19 @@ describe('useNativeLayout', () => {
       vi.advanceTimersByTime(16)
       await vi.runAllTimersAsync()
     }
+
+    expect(endCallback).toHaveBeenCalled()
+  })
+
+  it('should call end callbacks immediately for hierarchical layout', () => {
+    const layout = useNativeLayout({ layoutType: 'hierarchical' })
+    const endCallback = vi.fn()
+    const nodes = createMockNodes()
+    const links = createMockLinks()
+
+    layout.onEnd(endCallback)
+    layout.initialize(nodes, links)
+    layout.start()
 
     expect(endCallback).toHaveBeenCalled()
   })
@@ -201,8 +259,8 @@ describe('useNativeLayout', () => {
     expect(layout.links.value).toEqual([])
   })
 
-  it('should update node positions during simulation', async () => {
-    const layout = useNativeLayout({ iterations: 3 })
+  it('should update node positions during force simulation', async () => {
+    const layout = useNativeLayout({ iterations: 3, layoutType: 'force' })
     const nodes = createMockNodes()
     const links = createMockLinks()
 
@@ -230,8 +288,26 @@ describe('useNativeLayout', () => {
     expect(positionsChanged).toBe(true)
   })
 
-  it('should update stats during simulation', async () => {
-    const layout = useNativeLayout({ iterations: 3 })
+  it('should maintain fixed positions for hierarchical layout', () => {
+    const layout = useNativeLayout({ layoutType: 'hierarchical' })
+    const nodes = createMockNodes()
+    const links = createMockLinks()
+
+    layout.initialize(nodes, links)
+
+    // Store initial positions
+    const initialPositions = layout.nodes.value.map((n) => ({ x: n.x, y: n.y }))
+
+    layout.start()
+
+    // Positions should remain the same for hierarchical layout
+    const finalPositions = layout.nodes.value.map((n) => ({ x: n.x, y: n.y }))
+
+    expect(finalPositions).toEqual(initialPositions)
+  })
+
+  it('should update stats during force simulation', async () => {
+    const layout = useNativeLayout({ iterations: 3, layoutType: 'force' })
     const nodes = createMockNodes()
     const links = createMockLinks()
 
@@ -249,8 +325,20 @@ describe('useNativeLayout', () => {
     expect(layout.stats.value.lastTickTime).toBeGreaterThan(0)
   })
 
-  it('should stop animation when max iterations reached', async () => {
-    const layout = useNativeLayout({ iterations: 2 })
+  it('should have converged stats for hierarchical layout', () => {
+    const layout = useNativeLayout({ layoutType: 'hierarchical' })
+    const nodes = createMockNodes()
+    const links = createMockLinks()
+
+    layout.initialize(nodes, links)
+
+    expect(layout.stats.value.iterations).toBe(0)
+    expect(layout.stats.value.alpha).toBe(0)
+    expect(layout.stats.value.isConverged).toBe(true)
+  })
+
+  it('should stop force animation when max iterations reached', async () => {
+    const layout = useNativeLayout({ iterations: 2, layoutType: 'force' })
     const nodes = createMockNodes()
     const links = createMockLinks()
 
@@ -268,8 +356,8 @@ describe('useNativeLayout', () => {
     expect(layout.isRunning.value).toBe(false)
   })
 
-  it('should stop animation when converged', async () => {
-    const layout = useNativeLayout({ iterations: 100 })
+  it('should stop force animation when converged', async () => {
+    const layout = useNativeLayout({ iterations: 100, layoutType: 'force' })
     const nodes = createMockNodes()
     const links = createMockLinks()
 

@@ -5,6 +5,7 @@
 
 import { ref, computed, type Ref } from 'vue'
 import type { GraphNode, GraphLink, LayoutStats } from '@/types'
+import { HierarchicalLayout, type HierarchicalLayoutOptions } from '@/utils/hierarchical-layout'
 
 export interface NativeLayoutOptions {
   width: number
@@ -13,6 +14,7 @@ export interface NativeLayoutOptions {
   levelSpacing: number
   centerForce: number
   iterations: number
+  layoutType: 'hierarchical' | 'force'
 }
 
 export interface UseNativeLayoutReturn {
@@ -32,9 +34,10 @@ const DEFAULT_OPTIONS: NativeLayoutOptions = {
   width: 800,
   height: 600,
   nodeSpacing: 80,
-  levelSpacing: 150,
+  levelSpacing: 200,
   centerForce: 0.1,
   iterations: 300,
+  layoutType: 'hierarchical',
 }
 
 export function useNativeLayout(options: Partial<NativeLayoutOptions> = {}): UseNativeLayoutReturn {
@@ -62,42 +65,43 @@ export function useNativeLayout(options: Partial<NativeLayoutOptions> = {}): Use
   let startTime = 0
   let lastFrameTime = 0
 
-  // Calculate hierarchical layout positions
+  // Hierarchical layout engine
+  const hierarchicalLayout = new HierarchicalLayout({
+    nodeSpacing: layoutOptions.value.nodeSpacing,
+    levelSpacing: layoutOptions.value.levelSpacing,
+    nodeWidth: 160,
+    nodeHeight: 80,
+    direction: 'horizontal',
+    padding: {
+      top: 50,
+      right: 50,
+      bottom: 50,
+      left: 50,
+    },
+  })
+
+  // Calculate hierarchical layout positions using the dedicated engine
   const calculateHierarchicalLayout = (nodeList: GraphNode[]): GraphNode[] => {
     if (nodeList.length === 0) return []
 
-    // Group nodes by depth
-    const nodesByDepth = new Map<number, GraphNode[]>()
-    nodeList.forEach((node) => {
-      if (!nodesByDepth.has(node.depth)) {
-        nodesByDepth.set(node.depth, [])
-      }
-      nodesByDepth.get(node.depth)!.push(node)
+    // Calculate optimal spacing based on node content
+    const optimalSpacing = hierarchicalLayout.calculateOptimalSpacing(nodeList)
+
+    // Update hierarchical layout options with optimal spacing
+    hierarchicalLayout.updateOptions({
+      nodeSpacing: Math.max(layoutOptions.value.nodeSpacing, optimalSpacing.nodeSpacing),
+      levelSpacing: Math.max(layoutOptions.value.levelSpacing, optimalSpacing.levelSpacing),
     })
 
-    const positionedNodes: GraphNode[] = []
-    const maxDepth = Math.max(...nodeList.map((n) => n.depth))
+    // Calculate positions using the hierarchical layout engine
+    const positionedNodes = hierarchicalLayout.calculatePositions(nodeList)
 
-    // Position nodes level by level
-    nodesByDepth.forEach((nodesAtDepth, depth) => {
-      const x = depth * layoutOptions.value.levelSpacing + 100
-      const totalHeight = (nodesAtDepth.length - 1) * layoutOptions.value.nodeSpacing
-      const startY = (layoutOptions.value.height - totalHeight) / 2
-
-      nodesAtDepth.forEach((node, index) => {
-        const y = startY + index * layoutOptions.value.nodeSpacing
-
-        positionedNodes.push({
-          ...node,
-          x,
-          y,
-          vx: 0,
-          vy: 0,
-        })
-      })
-    })
-
-    return positionedNodes
+    // Initialize velocity properties for potential force simulation
+    return positionedNodes.map((node) => ({
+      ...node,
+      vx: 0,
+      vy: 0,
+    }))
   }
 
   // Simple force simulation step
@@ -266,9 +270,20 @@ export function useNativeLayout(options: Partial<NativeLayoutOptions> = {}): Use
       lastTickTime: 0,
     }
 
-    // Set initial positions using hierarchical layout
-    nodes.value = calculateHierarchicalLayout(nodeList)
-    links.value = [...linkList]
+    // Choose layout algorithm based on options
+    if (layoutOptions.value.layoutType === 'hierarchical') {
+      // Use hierarchical layout (JSONCrack style) - no animation needed
+      nodes.value = calculateHierarchicalLayout(nodeList)
+      links.value = [...linkList]
+
+      // Mark as converged immediately for hierarchical layout
+      stats.value.isConverged = true
+      stats.value.alpha = 0
+    } else {
+      // Use force-directed layout with animation
+      nodes.value = calculateHierarchicalLayout(nodeList) // Start with hierarchical positions
+      links.value = [...linkList]
+    }
 
     startTime = 0
     lastFrameTime = 0
@@ -277,6 +292,13 @@ export function useNativeLayout(options: Partial<NativeLayoutOptions> = {}): Use
   // Start animation
   const start = () => {
     if (isRunning.value) return
+
+    // For hierarchical layout, no animation is needed
+    if (layoutOptions.value.layoutType === 'hierarchical') {
+      // Immediately call end callbacks since layout is already complete
+      endCallbacks.forEach((callback) => callback(stats.value))
+      return
+    }
 
     isRunning.value = true
     stats.value.isConverged = false
@@ -295,6 +317,14 @@ export function useNativeLayout(options: Partial<NativeLayoutOptions> = {}): Use
   // Update layout options
   const updateOptions = (newOptions: Partial<NativeLayoutOptions>) => {
     layoutOptions.value = { ...layoutOptions.value, ...newOptions }
+
+    // Update hierarchical layout options if they changed
+    if (newOptions.nodeSpacing !== undefined || newOptions.levelSpacing !== undefined) {
+      hierarchicalLayout.updateOptions({
+        nodeSpacing: layoutOptions.value.nodeSpacing,
+        levelSpacing: layoutOptions.value.levelSpacing,
+      })
+    }
   }
 
   // Add tick callback
