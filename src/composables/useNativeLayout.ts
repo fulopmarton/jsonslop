@@ -33,8 +33,8 @@ export interface UseNativeLayoutReturn {
 const DEFAULT_OPTIONS: NativeLayoutOptions = {
   width: 800,
   height: 600,
-  nodeSpacing: 80,
-  levelSpacing: 200,
+  nodeSpacing: 60,
+  levelSpacing: 180,
   centerForce: 0.1,
   iterations: 300,
   layoutType: 'hierarchical',
@@ -83,6 +83,9 @@ export function useNativeLayout(options: Partial<NativeLayoutOptions> = {}): Use
   // Calculate hierarchical layout positions using the dedicated engine
   const calculateHierarchicalLayout = (nodeList: GraphNode[]): GraphNode[] => {
     if (nodeList.length === 0) return []
+
+    // Set canvas dimensions for proper centering
+    hierarchicalLayout.setCanvasDimensions(layoutOptions.value.width, layoutOptions.value.height)
 
     // Calculate optimal spacing based on node content
     const optimalSpacing = hierarchicalLayout.calculateOptimalSpacing(nodeList)
@@ -324,6 +327,11 @@ export function useNativeLayout(options: Partial<NativeLayoutOptions> = {}): Use
         nodeSpacing: layoutOptions.value.nodeSpacing,
         levelSpacing: layoutOptions.value.levelSpacing,
       })
+    }
+
+    // Update canvas dimensions if width or height changed
+    if (newOptions.width !== undefined || newOptions.height !== undefined) {
+      hierarchicalLayout.setCanvasDimensions(layoutOptions.value.width, layoutOptions.value.height)
     }
   }
 

@@ -40,8 +40,8 @@ export interface NodeLayout {
 }
 
 const DEFAULT_OPTIONS: HierarchicalLayoutOptions = {
-  nodeSpacing: 100, // Increased for better vertical spacing
-  levelSpacing: 250, // Increased for better horizontal level spacing
+  nodeSpacing: 60, // Reduced for more compact vertical spacing
+  levelSpacing: 200, // Reasonable horizontal level spacing
   nodeWidth: 160,
   nodeHeight: 80,
   direction: 'horizontal',
@@ -61,9 +61,19 @@ export class HierarchicalLayout {
   private nodeLayouts: Map<string, NodeLayout> = new Map()
   private levelHeights: Map<number, number> = new Map()
   private levelNodeCounts: Map<number, number> = new Map()
+  private canvasWidth: number = 800
+  private canvasHeight: number = 600
 
   constructor(options: Partial<HierarchicalLayoutOptions> = {}) {
     this.options = { ...DEFAULT_OPTIONS, ...options }
+  }
+
+  /**
+   * Set canvas dimensions for better centering
+   */
+  setCanvasDimensions(width: number, height: number): void {
+    this.canvasWidth = width
+    this.canvasHeight = height
   }
 
   /**
@@ -199,25 +209,38 @@ export class HierarchicalLayout {
    */
   private positionNodesByLevel(nodesByLevel: Map<number, GraphNode[]>): GraphNode[] {
     const positionedNodes: GraphNode[] = []
-    const levelPositions = new Map<number, { x: number; y: number }>()
 
-    // Initialize level positions
-    nodesByLevel.forEach((_, level) => {
-      levelPositions.set(level, { x: this.calculateLevelX(level), y: this.options.padding.top })
+    // Calculate total height needed for each level to enable vertical centering
+    const levelHeights = new Map<number, number>()
+    nodesByLevel.forEach((levelNodes, level) => {
+      let totalHeight = 0
+      levelNodes.forEach((node, index) => {
+        const nodeHeight = node.height || this.options.nodeHeight
+        totalHeight += nodeHeight
+        if (index < levelNodes.length - 1) {
+          totalHeight += this.options.nodeSpacing
+        }
+      })
+      levelHeights.set(level, totalHeight)
     })
 
     // Position nodes level by level, handling both vertical and horizontal spacing
     nodesByLevel.forEach((levelNodes, level) => {
-      const levelPos = levelPositions.get(level)!
-      let currentY = levelPos.y
-      let maxXInLevel = levelPos.x
+      const levelX = this.calculateLevelX(level)
+      const totalLevelHeight = levelHeights.get(level) || 0
+
+      // Calculate starting Y position to center this level's nodes vertically
+      const startY = Math.max(this.options.padding.top, (this.canvasHeight - totalLevelHeight) / 2)
+
+      let currentY = startY
+      let maxXInLevel = levelX
 
       levelNodes.forEach((node, siblingIndex) => {
         const nodeWidth = node.width || this.options.nodeWidth
         const nodeHeight = node.height || this.options.nodeHeight
 
         // Calculate position for this node
-        let nodeX = levelPos.x
+        let nodeX = levelX
         const nodeY = currentY
 
         // Add horizontal spacing if there are multiple nodes at this level
@@ -228,7 +251,7 @@ export class HierarchicalLayout {
             nodeWidth,
             nodeHeight,
             nodeY,
-            levelPos.x,
+            levelX,
           )
         }
 
@@ -261,9 +284,6 @@ export class HierarchicalLayout {
         maxXInLevel = Math.max(maxXInLevel, nodeX + nodeWidth)
         currentY += nodeHeight + this.options.nodeSpacing
       })
-
-      // Update the level position for potential future use
-      levelPositions.set(level, { x: levelPos.x, y: currentY })
     })
 
     return positionedNodes

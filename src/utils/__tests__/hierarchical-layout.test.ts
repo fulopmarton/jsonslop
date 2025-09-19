@@ -11,7 +11,7 @@ describe('HierarchicalLayout', () => {
 
   beforeEach(() => {
     layout = new HierarchicalLayout({
-      nodeSpacing: 80,
+      nodeSpacing: 60,
       levelSpacing: 200,
       nodeWidth: 160,
       nodeHeight: 80,
@@ -251,12 +251,12 @@ describe('HierarchicalLayout', () => {
       const level2 = result.find((n) => n.depth === 2)
 
       expect(level0?.x).toBe(50) // padding.left
-      expect(level1?.x).toBe(300) // padding.left + updated levelSpacing (50 + 250)
-      expect(level2?.x).toBe(550) // padding.left + 2 * updated levelSpacing (50 + 2*250)
+      expect(level1?.x).toBe(250) // padding.left + updated levelSpacing (50 + 200)
+      expect(level2?.x).toBe(450) // padding.left + 2 * updated levelSpacing (50 + 2*200)
 
       // Verify spacing is consistent
-      expect(level1!.x! - level0!.x!).toBe(250) // updated levelSpacing
-      expect(level2!.x! - level1!.x!).toBe(250) // updated levelSpacing
+      expect(level1!.x! - level0!.x!).toBe(200) // updated levelSpacing
+      expect(level2!.x! - level1!.x!).toBe(200) // updated levelSpacing
     })
 
     it('should position multiple nodes at same level with proper vertical spacing', () => {
@@ -274,7 +274,7 @@ describe('HierarchicalLayout', () => {
 
       // Should have proper vertical spacing
       const verticalSpacing = level1Nodes[1].y! - level1Nodes[0].y!
-      expect(verticalSpacing).toBeGreaterThanOrEqual(60 + 100) // nodeHeight + updated nodeSpacing
+      expect(verticalSpacing).toBeGreaterThanOrEqual(60 + 60) // nodeHeight + updated nodeSpacing
     })
 
     it('should add horizontal spacing between overlapping nodes at same level', () => {
@@ -368,6 +368,20 @@ describe('HierarchicalLayout', () => {
       expect(customNode?.width).toBe(300)
       expect(customNode?.height).toBe(120)
     })
+
+    it('should center nodes vertically within canvas height', () => {
+      const nodes = createMockNodes()
+
+      // Set canvas dimensions for proper centering
+      layout.setCanvasDimensions(800, 600)
+
+      const result = layout.calculatePositions(nodes)
+
+      // Check that nodes are positioned more towards the center rather than at the top
+      const rootNode = result.find((n) => n.id === 'root')
+      expect(rootNode?.y).toBeGreaterThan(100) // Should be well below the top padding
+      expect(rootNode?.y).toBeLessThan(400) // Should not be too far down
+    })
   })
 
   describe('getLayoutBounds', () => {
@@ -430,8 +444,8 @@ describe('HierarchicalLayout', () => {
 
     it('should return default spacing for empty nodes', () => {
       const spacing = layout.calculateOptimalSpacing([])
-      expect(spacing.nodeSpacing).toBe(100) // updated default
-      expect(spacing.levelSpacing).toBe(250) // updated default
+      expect(spacing.nodeSpacing).toBe(60) // updated default
+      expect(spacing.levelSpacing).toBe(200) // updated default
     })
   })
 
@@ -489,8 +503,8 @@ describe('HierarchicalLayout', () => {
       expect(stats.levels).toBe(3) // depths 0, 1, 2
       expect(stats.averageNodesPerLevel).toBe(1) // 3 nodes / 3 levels
       expect(stats.layoutBounds).toBeDefined()
-      expect(stats.spacing.nodeSpacing).toBe(100)
-      expect(stats.spacing.levelSpacing).toBe(250)
+      expect(stats.spacing.nodeSpacing).toBe(60)
+      expect(stats.spacing.levelSpacing).toBe(200)
     })
   })
 

@@ -113,8 +113,8 @@ const zoom = useNativeZoom({
 const layout = useNativeLayout({
     width: props.width,
     height: props.height,
-    nodeSpacing: 80,
-    levelSpacing: 150,
+    nodeSpacing: 60,
+    levelSpacing: 180,
     centerForce: 0.1,
     iterations: 300
 })
