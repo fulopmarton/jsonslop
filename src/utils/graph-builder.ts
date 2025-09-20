@@ -113,7 +113,7 @@ export const calculateNodeHeight = (properties: NodeProperty[]): number => {
 /**
  * Formats a property value for display in the node
  */
-export const formatPropertyValue = (value: any, type: NodeProperty['type']): string => {
+export const formatPropertyValue = (value: unknown, type: NodeProperty['type']): string => {
   switch (type) {
     case 'string':
       const str = String(value)
@@ -198,7 +198,12 @@ export class GraphBuilder {
           }
         })
       } else {
-        Object.entries(data as Record<string, unknown>).forEach(([key, value]) => {
+        // Sort object keys alphabetically before processing
+        const sortedEntries = Object.entries(data as Record<string, unknown>).sort(
+          ([keyA], [keyB]) => keyA.localeCompare(keyB),
+        )
+
+        sortedEntries.forEach(([key, value]) => {
           const valueType = getDataType(value)
           const isContainer = valueType === 'object' || valueType === 'array'
 
