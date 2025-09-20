@@ -1,11 +1,13 @@
 import type { ValidationError } from '@/types'
 import { parseJSON, extractValidationError } from '@/utils/json-parser'
+import { JSONFixer, type JSONFixResult } from '@/utils/json-preprocessor'
 
 export interface ValidationResult {
   isValid: boolean
   errors: ValidationError[]
   warnings: ValidationError[]
   suggestions: string[]
+  fixResult?: JSONFixResult
 }
 
 export interface ValidationOptions {
@@ -63,6 +65,10 @@ export class ValidationService {
     result.errors = parseResult.errors
 
     if (!parseResult.isValid) {
+      // Try to fix the JSON if it's invalid
+      const fixResult = JSONFixer.attemptFix(jsonString)
+      result.fixResult = fixResult
+
       // Add suggestions for common errors
       if (this.options.provideSuggestions) {
         result.suggestions = this.generateErrorSuggestions(jsonString, parseResult.errors)

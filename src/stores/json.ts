@@ -36,6 +36,7 @@ export const useJsonStore = defineStore('json', () => {
   const validationErrors = ref<ValidationError[]>([])
   const validationWarnings = ref<ValidationError[]>([])
   const validationSuggestions = ref<string[]>([])
+  const validationResult = ref<ValidationResult | null>(null)
 
   // Tree state management
   const treeState = ref<TreeState>({
@@ -92,6 +93,25 @@ export const useJsonStore = defineStore('json', () => {
   const hasWarnings = computed(() => validationWarnings.value.length > 0)
   const totalNodes = computed(() => countNodes(jsonTree.value))
   const expandedNodeCount = computed(() => treeState.value.expandedNodes.size)
+
+  // JSON fix computed properties
+  const canFixJson = computed(() => {
+    const result =
+      validationResult.value?.fixResult?.canFix && validationResult.value?.fixResult?.isValid
+    console.log('canFixJson computed:', {
+      hasValidationResult: !!validationResult.value,
+      hasFixResult: !!validationResult.value?.fixResult,
+      canFix: validationResult.value?.fixResult?.canFix,
+      isValid: validationResult.value?.fixResult?.isValid,
+      result,
+    })
+    return result
+  })
+  const jsonFixSuggestions = computed(() => {
+    const suggestions = validationResult.value?.fixResult?.fixes.map((fix) => fix.description) || []
+    console.log('jsonFixSuggestions computed:', suggestions)
+    return suggestions
+  })
 
   // Graph computed properties
   const graphNodes = computed(() => graphState.value.nodes)
@@ -177,6 +197,13 @@ export const useJsonStore = defineStore('json', () => {
     validateAndParseJson(input)
   }
 
+  const applyJsonFix = () => {
+    const validationResult = validationService.validate(rawJsonInput.value)
+    if (validationResult.fixResult?.canFix && validationResult.fixResult.isValid) {
+      updateJsonInput(validationResult.fixResult.fixedJSON)
+    }
+  }
+
   const validateAndParseJson = (input: string) => {
     console.log('validateAndParseJson called with:', input) // Debug log
     try {
@@ -186,15 +213,16 @@ export const useJsonStore = defineStore('json', () => {
       validationSuggestions.value = []
 
       // Validate JSON
-      const validationResult: ValidationResult = validationService.validate(input)
-      console.log('Validation result:', validationResult) // Debug log
+      const currentValidationResult: ValidationResult = validationService.validate(input)
+      console.log('Validation result:', currentValidationResult) // Debug log
 
-      validationErrors.value = validationResult.errors
-      validationWarnings.value = validationResult.warnings
-      validationSuggestions.value = validationResult.suggestions
-      isValidJson.value = validationResult.isValid
+      validationResult.value = currentValidationResult
+      validationErrors.value = currentValidationResult.errors
+      validationWarnings.value = currentValidationResult.warnings
+      validationSuggestions.value = currentValidationResult.suggestions
+      isValidJson.value = currentValidationResult.isValid
 
-      if (validationResult.isValid) {
+      if (currentValidationResult.isValid) {
         // Parse JSON data
         const parseResult: ParseResult = parseJSON(input)
 
@@ -736,6 +764,8 @@ export const useJsonStore = defineStore('json', () => {
     validationStatus,
     statusMessage,
     statusColor,
+    canFixJson,
+    jsonFixSuggestions,
     // Graph computed
     graphNodes,
     graphLinks,
@@ -745,6 +775,7 @@ export const useJsonStore = defineStore('json', () => {
 
     // Actions
     updateJsonInput,
+    applyJsonFix,
     validateAndParseJson,
     toggleNodeExpansion,
     expandNode,

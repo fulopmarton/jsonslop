@@ -50,6 +50,24 @@
                     </div>
                 </div>
 
+                <!-- Fix JSON Button -->
+                <button v-if="canFixJson" @click="applyJsonFix"
+                    class="btn-primary text-xs px-2 py-1 sm:px-3 sm:py-1 hover-lift bg-green-600 hover:bg-green-700 border-green-600 hover:border-green-700"
+                    :title="`Apply ${jsonFixSuggestions.length} automatic fix${jsonFixSuggestions.length !== 1 ? 'es' : ''} to make JSON valid`">
+                    <svg class="w-3 h-3 mr-1 inline" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd"
+                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                            clip-rule="evenodd" />
+                    </svg>
+                    Fix JSON
+                </button>
+
+                <!-- Test Broken JSON Button -->
+                <button @click="testBrokenJson" class="btn-secondary text-xs px-2 py-1 sm:px-3 sm:py-1 hover-lift"
+                    title="Load broken JSON to test fix feature">
+                    Test Fix
+                </button>
+
                 <!-- Clear Button -->
                 <button @click="clearInput" :disabled="!rawJsonInput.trim()"
                     class="btn-secondary text-xs px-2 py-1 sm:px-3 sm:py-1 hover-lift"
@@ -80,7 +98,7 @@
                         </svg>
                         <div class="min-w-0 flex-1">
                             <span class="font-medium status-error">Line {{ error.line }}, Column {{ error.column
-                            }}:</span>
+                                }}:</span>
                             <span class="status-error ml-1 break-words">{{ error.message }}</span>
                         </div>
                     </div>
@@ -96,7 +114,7 @@
                         </svg>
                         <div class="min-w-0 flex-1">
                             <span class="font-medium status-warning">Line {{ warning.line }}, Column {{ warning.column
-                            }}:</span>
+                                }}:</span>
                             <span class="status-warning ml-1 break-words">{{ warning.message }}</span>
                         </div>
                     </div>
@@ -104,7 +122,34 @@
             </div>
         </div>
 
-        <!-- Suggestions -->
+        <!-- JSON Fix Suggestions -->
+        <div v-if="canFixJson && jsonFixSuggestions.length > 0" data-testid="fix-suggestions-display"
+            class="border-t max-h-32 overflow-y-auto bg-green-50 dark:bg-green-900/20"
+            style="border-color: var(--border-primary);">
+            <div class="p-3">
+                <div class="text-sm font-medium mb-2 flex items-center gap-2 text-green-600 dark:text-green-400">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd"
+                            d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                            clip-rule="evenodd" />
+                    </svg>
+                    Auto-fix available! Click "Fix JSON" to apply:
+                </div>
+                <ul class="space-y-1">
+                    <li v-for="(suggestion, index) in jsonFixSuggestions" :key="index"
+                        class="text-sm flex items-start gap-2 text-green-600 dark:text-green-400">
+                        <svg class="w-3 h-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd"
+                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                clip-rule="evenodd" />
+                        </svg>
+                        <span>{{ suggestion }}</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- General Suggestions -->
         <div v-if="validationSuggestions.length > 0" data-testid="suggestions-display"
             class="border-t max-h-24 overflow-y-auto"
             style="border-color: var(--border-primary); background-color: var(--bg-accent);">
@@ -144,7 +189,9 @@ const {
     validationStatus,
     statusMessage,
     statusColor,
-    uiPreferences
+    uiPreferences,
+    canFixJson,
+    jsonFixSuggestions
 } = storeToRefs(jsonStore)
 
 // Component refs
@@ -411,6 +458,21 @@ const clearInput = () => {
     jsonStore.clearAllData()
 }
 
+// Apply JSON fix
+const applyJsonFix = () => {
+    console.log('Applying JSON fix...')
+    jsonStore.applyJsonFix()
+}
+
+// Debug computed properties
+watch(canFixJson, (newValue) => {
+    console.log('canFixJson changed:', newValue)
+})
+
+watch(jsonFixSuggestions, (newValue) => {
+    console.log('jsonFixSuggestions changed:', newValue)
+})
+
 // Format JSON
 const formatJson = () => {
     if (editor && hasValidJson.value) {
@@ -504,5 +566,25 @@ defineExpose({
 .json-input-panel {
     min-height: 0;
     /* Allow flex child to shrink */
+}
+
+/* Success styling for fix suggestions */
+:deep(.status-success) {
+    color: #059669;
+}
+
+:deep(.bg-success-light) {
+    background-color: #ecfdf5;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    :deep(.status-success) {
+        color: #10b981;
+    }
+
+    :deep(.bg-success-light) {
+        background-color: #064e3b;
+    }
 }
 </style>
