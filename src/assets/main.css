@@ -1,6 +1,5 @@
-@import 'tailwindcss';
 @import './base.css';
-
+@import 'tailwindcss';
 /* JSON Visualization App Styles */
 #app {
   font-weight: normal;
