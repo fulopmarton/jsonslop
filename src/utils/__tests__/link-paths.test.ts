@@ -72,6 +72,27 @@ describe('Link Paths Utilities', () => {
 
       expect(connectionPoint).toBeNull()
     })
+
+    it('should use actual node width for wider nodes', () => {
+      const wideNode = createMockNode('root', 100, 50, [
+        {
+          key: 'this_is_a_very_long_property_name_that_should_make_the_node_wider',
+          hasChildNode: true,
+          childNodeId: 'child',
+        },
+      ])
+      // Simulate a wider node (like what would be calculated by calculateNodeWidth)
+      wideNode.width = 280
+
+      const connectionPoint = getPropertyConnectionPoint(
+        wideNode,
+        'this_is_a_very_long_property_name_that_should_make_the_node_wider',
+      )
+
+      expect(connectionPoint).toBeDefined()
+      expect(connectionPoint?.x).toBe(380) // 100 + 280 (actual node width, not default 150)
+      expect(connectionPoint?.y).toBe(84) // 50 + 24 + (0 * 20) + 10
+    })
   })
 
   describe('getNodeEntryPoint', () => {
@@ -82,6 +103,17 @@ describe('Link Paths Utilities', () => {
 
       expect(entryPoint.x).toBe(300) // node.x
       expect(entryPoint.y).toBe(140) // 100 + 80/2 (y + nodeHeight/2)
+    })
+
+    it('should use actual node height for taller nodes', () => {
+      const tallNode = createMockNode('child', 300, 100, [])
+      // Simulate a taller node (like what would be calculated by calculateNodeHeight)
+      tallNode.height = 120
+
+      const entryPoint = getNodeEntryPoint(tallNode)
+
+      expect(entryPoint.x).toBe(300) // node.x
+      expect(entryPoint.y).toBe(160) // 100 + 120/2 (y + actual node height/2)
     })
   })
 

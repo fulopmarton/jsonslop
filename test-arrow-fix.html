@@ -3,36 +3,155 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Arrow Position Test</title>
+    <title>Arrow Position Test - FIXED</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      textarea {
+        width: 100%;
+        font-family: 'Monaco', 'Consolas', monospace;
+        font-size: 12px;
+      }
+      .success {
+        color: green;
+        background: #f0f8f0;
+        padding: 10px;
+        border-radius: 4px;
+        margin: 10px 0;
+      }
+      .error {
+        color: red;
+        background: #fff0f0;
+        padding: 10px;
+        border-radius: 4px;
+        margin: 10px 0;
+      }
+      .test-case {
+        margin: 20px 0;
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+      }
+      .test-case h3 {
+        margin-top: 0;
+        color: #333;
+      }
+    </style>
   </head>
   <body>
-    <h1>Arrow Position Fix Test</h1>
-    <p>Test JSON with nodes of different widths:</p>
-    <textarea id="testJson" rows="10" cols="50">
+    <h1>🎯 Arrow Position Fix Test - FIXED!</h1>
+
+    <div class="success">
+      <strong>✅ Fix Applied:</strong> Arrows now correctly start from the right edge of nodes,
+      regardless of node width. The <code>getPropertyConnectionPoint</code> and
+      <code>getNodeEntryPoint</code> functions now use the actual node dimensions
+      (<code>node.width</code>, <code>node.height</code>) instead of hardcoded defaults.
+    </div>
+
+    <div class="test-case">
+      <h3>Test Case 1: Mixed Width Nodes</h3>
+      <p>This JSON contains properties with different lengths, creating nodes of varying widths:</p>
+      <textarea id="testJson1" rows="8" cols="50">
 {
   "short": "value",
   "this_is_a_very_long_property_name_that_should_make_the_node_wider": "test",
   "nested": {
     "child1": "value1",
-    "another_very_long_property_name_here": "value2"
+    "another_very_long_property_name_here": "value2",
+    "deeply": {
+      "nested": {
+        "structure": "with normal names"
+      }
+    }
   }
 }</textarea
-    >
-    <br />
-    <button onclick="testArrows()">Test Arrow Positioning</button>
-    <div id="result"></div>
+      >
+      <br />
+      <button onclick="testArrows('testJson1', 'result1')">Test Case 1</button>
+      <div id="result1"></div>
+    </div>
+
+    <div class="test-case">
+      <h3>Test Case 2: Extreme Width Differences</h3>
+      <p>This JSON has extreme differences in property name lengths:</p>
+      <textarea id="testJson2" rows="8" cols="50">
+{
+  "a": "short",
+  "this_property_name_is_extremely_long_and_should_create_a_very_wide_node_to_test_arrow_positioning": {
+    "b": "normal",
+    "another_extremely_long_property_name_that_tests_the_width_calculation_algorithm": "value"
+  },
+  "c": {
+    "x": 1,
+    "y": 2
+  }
+}</textarea
+      >
+      <br />
+      <button onclick="testArrows('testJson2', 'result2')">Test Case 2</button>
+      <div id="result2"></div>
+    </div>
+
+    <div class="test-case">
+      <h3>Test Case 3: Arrays with Long Names</h3>
+      <p>This JSON tests arrays with long property names:</p>
+      <textarea id="testJson3" rows="10" cols="50">
+{
+  "configuration_settings_for_application": {
+    "database_connection_parameters": [
+      "localhost:5432",
+      "username_for_database_connection",
+      "password_for_database_connection"
+    ],
+    "feature_flags_and_experimental_options": {
+      "enable_advanced_caching_mechanism": true,
+      "use_experimental_query_optimization": false
+    }
+  }
+}</textarea
+      >
+      <br />
+      <button onclick="testArrows('testJson3', 'result3')">Test Case 3</button>
+      <div id="result3"></div>
+    </div>
 
     <script>
-      function testArrows() {
-        const json = document.getElementById('testJson').value
+      function testArrows(textareaId, resultId) {
+        const json = document.getElementById(textareaId).value
+        const resultDiv = document.getElementById(resultId)
+
         try {
           const parsed = JSON.parse(json)
-          document.getElementById('result').innerHTML =
-            '<p>JSON parsed successfully. Check the graph view to see if arrows start from the correct positions on wider nodes.</p>'
+          resultDiv.innerHTML = `
+            <div class="success">
+              <strong>✅ JSON Valid!</strong> 
+              <p>Paste this JSON into the main application and switch to Graph View. 
+              You should see that arrows now correctly start from the right edge of each node, 
+              even for nodes with very long property names that make them wider than the default 150px.</p>
+              <p><strong>Before the fix:</strong> Arrows would start from a fixed position (150px from the left edge), 
+              causing them to appear to start from the middle of wider nodes.</p>
+              <p><strong>After the fix:</strong> Arrows start from the actual right edge of each node, 
+              using the calculated node width.</p>
+            </div>
+          `
         } catch (e) {
-          document.getElementById('result').innerHTML =
-            '<p style="color: red;">Invalid JSON: ' + e.message + '</p>'
+          resultDiv.innerHTML = `
+            <div class="error">
+              <strong>❌ Invalid JSON:</strong> ${e.message}
+            </div>
+          `
         }
+      }
+
+      // Test all cases on page load
+      window.onload = function () {
+        testArrows('testJson1', 'result1')
+        testArrows('testJson2', 'result2')
+        testArrows('testJson3', 'result3')
       }
     </script>
   </body>

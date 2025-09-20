@@ -35,7 +35,9 @@ export function getPropertyConnectionPoint(
   const property = node.properties[propertyIndex]
   if (!property.hasChildNode) return null
 
-  const x = (node.x || 0) + nodeWidth
+  // Use the actual node's width if available, otherwise fall back to the parameter
+  const actualNodeWidth = node.width || nodeWidth
+  const x = (node.x || 0) + actualNodeWidth
   const y = (node.y || 0) + headerHeight + propertyIndex * propertyHeight + propertyHeight / 2
 
   return {
@@ -55,7 +57,9 @@ export function getNodeEntryPoint(
   nodeHeight: number = 80,
 ): ConnectionPoint {
   const x = node.x || 0
-  const y = (node.y || 0) + nodeHeight / 2
+  // Use the actual node's height if available, otherwise fall back to the parameter
+  const actualNodeHeight = node.height || nodeHeight
+  const y = (node.y || 0) + actualNodeHeight / 2
 
   return { x, y }
 }

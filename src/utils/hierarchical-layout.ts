@@ -40,8 +40,8 @@ export interface NodeLayout {
 }
 
 const DEFAULT_OPTIONS: HierarchicalLayoutOptions = {
-  nodeSpacing: 80, // Increased for better visual separation
-  levelSpacing: 220, // Increased for better arrow routing space
+  nodeSpacing: 60, // Reduced since we now use balanced columns
+  levelSpacing: 250, // Increased to accommodate multiple columns
   nodeWidth: 150,
   nodeHeight: 80,
   direction: 'horizontal',
@@ -205,95 +205,245 @@ export class HierarchicalLayout {
   }
 
   /**
-   * Position nodes level by level using JSONCrack-style left-to-right layout
+   * Position nodes level by level using balanced hierarchical layout
    */
   private positionNodesByLevel(nodesByLevel: Map<number, GraphNode[]>): GraphNode[] {
     const positionedNodes: GraphNode[] = []
 
-    // Calculate total height needed for all nodes to enable global vertical centering
-    let totalLayoutHeight = 0
-    const levelHeights = new Map<number, number>()
+    // Position root nodes first
+    const rootNodes = nodesByLevel.get(0) || []
+    if (rootNodes.length > 0) {
+      this.positionRootNodes(rootNodes, positionedNodes)
+    }
 
-    nodesByLevel.forEach((levelNodes, level) => {
-      let levelHeight = 0
-      levelNodes.forEach((node, index) => {
-        const nodeHeight = node.height || this.options.nodeHeight
-        levelHeight += nodeHeight
-        if (index < levelNodes.length - 1) {
-          levelHeight += this.options.nodeSpacing
-        }
-      })
-      levelHeights.set(level, levelHeight)
-      totalLayoutHeight = Math.max(totalLayoutHeight, levelHeight)
-    })
-
-    // Calculate global starting Y position to center the entire layout
-    const globalStartY = Math.max(
-      this.options.padding.top,
-      (this.canvasHeight - totalLayoutHeight) / 2,
-    )
-
-    // Position nodes level by level, handling both vertical and horizontal spacing
-    nodesByLevel.forEach((levelNodes, level) => {
-      const levelX = this.calculateLevelX(level)
-      const levelHeight = levelHeights.get(level) || 0
-
-      // Center this level's nodes within the global layout height
-      const levelStartY = globalStartY + (totalLayoutHeight - levelHeight) / 2
-
-      let currentY = levelStartY
-
-      levelNodes.forEach((node, siblingIndex) => {
-        const nodeWidth = node.width || this.options.nodeWidth
-        const nodeHeight = node.height || this.options.nodeHeight
-
-        // Calculate position for this node
-        let nodeX = levelX
-        const nodeY = currentY
-
-        // Add horizontal spacing if there are multiple nodes at this level
-        if (siblingIndex > 0) {
-          // Find a position that doesn't overlap with existing nodes at this level
-          nodeX = this.findNonOverlappingXPosition(
-            positionedNodes.filter((n) => n.depth === level),
-            nodeWidth,
-            nodeHeight,
-            nodeY,
-            levelX,
-          )
-        }
-
-        // Create node layout info
-        const nodeLayout: NodeLayout = {
-          node,
-          x: nodeX,
-          y: nodeY,
-          width: nodeWidth,
-          height: nodeHeight,
-          level,
-          siblings: levelNodes.length,
-          siblingIndex,
-        }
-
-        this.nodeLayouts.set(node.id, nodeLayout)
-
-        // Create positioned node
-        const positionedNode: GraphNode = {
-          ...node,
-          x: nodeX,
-          y: nodeY,
-          width: nodeWidth,
-          height: nodeHeight,
-        }
-
-        positionedNodes.push(positionedNode)
-
-        // Update Y position for next node in this level
-        currentY += nodeHeight + this.options.nodeSpacing
-      })
-    })
+    // Position child nodes level by level
+    for (let level = 1; level <= Math.max(...nodesByLevel.keys()); level++) {
+      const levelNodes = nodesByLevel.get(level) || []
+      this.positionLevelNodes(levelNodes, positionedNodes, level)
+    }
 
     return positionedNodes
+  }
+
+  /**
+   * Position root nodes
+   */
+  private positionRootNodes(rootNodes: GraphNode[], positionedNodes: GraphNode[]): void {
+    const startY = this.options.padding.top
+    let currentY = startY
+
+    rootNodes.forEach((node, index) => {
+      const nodeWidth = node.width || this.options.nodeWidth
+      const nodeHeight = node.height || this.options.nodeHeight
+      const nodeX = this.options.padding.left
+      const nodeY = currentY
+
+      const nodeLayout: NodeLayout = {
+        node,
+        x: nodeX,
+        y: nodeY,
+        width: nodeWidth,
+        height: nodeHeight,
+        level: 0,
+        siblings: rootNodes.length,
+        siblingIndex: index,
+      }
+
+      this.nodeLayouts.set(node.id, nodeLayout)
+
+      const positionedNode: GraphNode = {
+        ...node,
+        x: nodeX,
+        y: nodeY,
+        width: nodeWidth,
+        height: nodeHeight,
+      }
+
+      positionedNodes.push(positionedNode)
+      currentY += nodeHeight + this.options.nodeSpacing
+    })
+  }
+
+  /**
+   * Position nodes at a specific level
+   */
+  private positionLevelNodes(
+    levelNodes: GraphNode[],
+    positionedNodes: GraphNode[],
+    level: number,
+  ): void {
+    // Group level nodes by parent
+    const nodesByParent = new Map<string, GraphNode[]>()
+    levelNodes.forEach((node) => {
+      const parentId = node.parent || 'root'
+      if (!nodesByParent.has(parentId)) {
+        nodesByParent.set(parentId, [])
+      }
+      nodesByParent.get(parentId)!.push(node)
+    })
+
+    // Position each group of siblings
+    nodesByParent.forEach((siblings, parentId) => {
+      const parentNode = positionedNodes.find((n) => n.id === parentId)
+      if (!parentNode) return
+
+      this.positionSiblings(siblings, parentNode, positionedNodes, level)
+    })
+  }
+
+  /**
+   * Position siblings in a balanced arrangement around their parent
+   */
+  private positionSiblings(
+    siblings: GraphNode[],
+    parentNode: GraphNode,
+    positionedNodes: GraphNode[],
+    level: number,
+  ): void {
+    if (siblings.length === 0) return
+
+    const baseX = this.calculateLevelX(level)
+    const parentY = parentNode.y || 0
+    const parentHeight = parentNode.height || this.options.nodeHeight
+
+    // For single child, center it with parent
+    if (siblings.length === 1) {
+      const node = siblings[0]
+      const nodeWidth = node.width || this.options.nodeWidth
+      const nodeHeight = node.height || this.options.nodeHeight
+
+      const nodeX = this.findNonOverlappingXPosition(
+        positionedNodes.filter((n) => n.depth === level),
+        nodeWidth,
+        nodeHeight,
+        parentY + (parentHeight - nodeHeight) / 2,
+        baseX,
+      )
+
+      this.addPositionedNode(
+        node,
+        nodeX,
+        parentY + (parentHeight - nodeHeight) / 2,
+        level,
+        siblings.length,
+        0,
+        positionedNodes,
+      )
+      return
+    }
+
+    // For multiple children, arrange in balanced columns
+    const maxChildrenPerColumn = Math.min(4, Math.max(2, Math.ceil(Math.sqrt(siblings.length))))
+    const columns = Math.ceil(siblings.length / maxChildrenPerColumn)
+
+    let globalMinY = Infinity
+    let globalMaxY = -Infinity
+
+    // Calculate total height needed for all columns
+    for (let col = 0; col < columns; col++) {
+      const startIndex = col * maxChildrenPerColumn
+      const endIndex = Math.min(startIndex + maxChildrenPerColumn, siblings.length)
+      const columnNodes = siblings.slice(startIndex, endIndex)
+
+      let columnHeight = 0
+      columnNodes.forEach((node, index) => {
+        const nodeHeight = node.height || this.options.nodeHeight
+        columnHeight += nodeHeight
+        if (index < columnNodes.length - 1) {
+          columnHeight += this.options.nodeSpacing
+        }
+      })
+
+      const columnStartY = parentY + (parentHeight - columnHeight) / 2
+      globalMinY = Math.min(globalMinY, columnStartY)
+      globalMaxY = Math.max(globalMaxY, columnStartY + columnHeight)
+    }
+
+    // Position nodes in each column
+    for (let col = 0; col < columns; col++) {
+      const startIndex = col * maxChildrenPerColumn
+      const endIndex = Math.min(startIndex + maxChildrenPerColumn, siblings.length)
+      const columnNodes = siblings.slice(startIndex, endIndex)
+
+      // Calculate column height
+      let columnHeight = 0
+      columnNodes.forEach((node, index) => {
+        const nodeHeight = node.height || this.options.nodeHeight
+        columnHeight += nodeHeight
+        if (index < columnNodes.length - 1) {
+          columnHeight += this.options.nodeSpacing
+        }
+      })
+
+      // Center column relative to parent
+      const columnStartY = parentY + (parentHeight - columnHeight) / 2
+      let currentY = columnStartY
+
+      // Position each node in this column
+      columnNodes.forEach((node, nodeIndex) => {
+        const nodeWidth = node.width || this.options.nodeWidth
+        const nodeHeight = node.height || this.options.nodeHeight
+        const xOffset = col * 200 // Horizontal spacing between columns
+
+        const nodeX = this.findNonOverlappingXPosition(
+          positionedNodes.filter((n) => n.depth === level),
+          nodeWidth,
+          nodeHeight,
+          currentY,
+          baseX + xOffset,
+        )
+
+        this.addPositionedNode(
+          node,
+          nodeX,
+          currentY,
+          level,
+          siblings.length,
+          startIndex + nodeIndex,
+          positionedNodes,
+        )
+        currentY += nodeHeight + this.options.nodeSpacing
+      })
+    }
+  }
+
+  /**
+   * Helper method to add a positioned node
+   */
+  private addPositionedNode(
+    node: GraphNode,
+    x: number,
+    y: number,
+    level: number,
+    siblings: number,
+    siblingIndex: number,
+    positionedNodes: GraphNode[],
+  ): void {
+    const nodeWidth = node.width || this.options.nodeWidth
+    const nodeHeight = node.height || this.options.nodeHeight
+
+    const nodeLayout: NodeLayout = {
+      node,
+      x,
+      y,
+      width: nodeWidth,
+      height: nodeHeight,
+      level,
+      siblings,
+      siblingIndex,
+    }
+
+    this.nodeLayouts.set(node.id, nodeLayout)
+
+    const positionedNode: GraphNode = {
+      ...node,
+      x,
+      y,
+      width: nodeWidth,
+      height: nodeHeight,
+    }
+
+    positionedNodes.push(positionedNode)
   }
 
   /**
@@ -313,7 +463,7 @@ export class HierarchicalLayout {
     nodeY: number,
     baseX: number,
   ): number {
-    const horizontalSpacing = 30 // Increased minimum horizontal spacing between nodes
+    const horizontalSpacing = 25 // Minimum horizontal spacing between nodes
     const verticalBuffer = 10 // Buffer zone for vertical overlap detection
 
     // If no existing nodes, use base position
@@ -321,25 +471,51 @@ export class HierarchicalLayout {
       return baseX
     }
 
-    // Find the rightmost position of existing nodes that might overlap vertically
-    let rightmostX = baseX
+    // Sort existing nodes by X position for more efficient checking
+    const sortedNodes = [...existingNodesAtLevel].sort((a, b) => (a.x || 0) - (b.x || 0))
 
-    for (const existingNode of existingNodesAtLevel) {
+    // Find all nodes that vertically overlap with the new node
+    const verticallyOverlappingNodes = sortedNodes.filter((existingNode) => {
       const existingY = existingNode.y || 0
       const existingHeight = existingNode.height || this.options.nodeHeight
-      const existingX = existingNode.x || 0
-      const existingWidth = existingNode.width || this.options.nodeWidth
 
       // Check if there's vertical overlap with buffer zone
-      const verticalOverlap = !(
+      return !(
         nodeY >= existingY + existingHeight + verticalBuffer || // New node is below existing (with buffer)
         nodeY + nodeHeight + verticalBuffer <= existingY // New node is above existing (with buffer)
       )
+    })
 
-      if (verticalOverlap) {
-        // There's vertical overlap, so we need horizontal separation
-        rightmostX = Math.max(rightmostX, existingX + existingWidth + horizontalSpacing)
-      }
+    // If no vertical overlaps, we can use the base position
+    if (verticallyOverlappingNodes.length === 0) {
+      return baseX
+    }
+
+    // Try the base position first
+    const candidateX = baseX
+    let isValidPosition = false
+
+    // Check if base position works
+    isValidPosition = !verticallyOverlappingNodes.some((existingNode) => {
+      const existingX = existingNode.x || 0
+      const existingWidth = existingNode.width || this.options.nodeWidth
+
+      return !(
+        candidateX >= existingX + existingWidth + horizontalSpacing || // New node is to the right
+        candidateX + nodeWidth + horizontalSpacing <= existingX // New node is to the left
+      )
+    })
+
+    if (isValidPosition) {
+      return candidateX
+    }
+
+    // Find the rightmost position among vertically overlapping nodes
+    let rightmostX = baseX
+    for (const existingNode of verticallyOverlappingNodes) {
+      const existingX = existingNode.x || 0
+      const existingWidth = existingNode.width || this.options.nodeWidth
+      rightmostX = Math.max(rightmostX, existingX + existingWidth + horizontalSpacing)
     }
 
     return rightmostX
