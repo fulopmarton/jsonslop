@@ -42,7 +42,7 @@ export interface NodeLayout {
 const DEFAULT_OPTIONS: HierarchicalLayoutOptions = {
   nodeSpacing: 80, // Increased for better visual separation
   levelSpacing: 220, // Increased for better arrow routing space
-  nodeWidth: 160,
+  nodeWidth: 150,
   nodeHeight: 80,
   direction: 'horizontal',
   padding: {

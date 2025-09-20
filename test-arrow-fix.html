@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Arrow Position Test</title>
+  </head>
+  <body>
+    <h1>Arrow Position Fix Test</h1>
+    <p>Test JSON with nodes of different widths:</p>
+    <textarea id="testJson" rows="10" cols="50">
+{
+  "short": "value",
+  "this_is_a_very_long_property_name_that_should_make_the_node_wider": "test",
+  "nested": {
+    "child1": "value1",
+    "another_very_long_property_name_here": "value2"
+  }
+}</textarea
+    >
+    <br />
+    <button onclick="testArrows()">Test Arrow Positioning</button>
+    <div id="result"></div>
+
+    <script>
+      function testArrows() {
+        const json = document.getElementById('testJson').value
+        try {
+          const parsed = JSON.parse(json)
+          document.getElementById('result').innerHTML =
+            '<p>JSON parsed successfully. Check the graph view to see if arrows start from the correct positions on wider nodes.</p>'
+        } catch (e) {
+          document.getElementById('result').innerHTML =
+            '<p style="color: red;">Invalid JSON: ' + e.message + '</p>'
+        }
+      }
+    </script>
+  </body>
+</html>

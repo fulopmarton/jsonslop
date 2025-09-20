@@ -53,19 +53,6 @@
                 :stroke="nodeStroke" :stroke-width="1" class="connection-point" />
         </g>
 
-        <!-- Tooltip -->
-        <foreignObject v-if="showTooltip" :x="tooltipX" :y="tooltipY" :width="tooltipWidth" :height="tooltipHeight"
-            class="tooltip-container">
-            <div class="tooltip" xmlns="http://www.w3.org/1999/xhtml">
-                <div class="tooltip-header">
-                    <span class="tooltip-key">{{ node.key }}</span>
-                    <span class="tooltip-type">{{ node.type.toUpperCase() }}</span>
-                </div>
-                <div class="tooltip-value">{{ tooltipValue }}</div>
-                <div class="tooltip-path">{{ node.path.join('.') || 'root' }}</div>
-                <div class="tooltip-properties">{{ node.properties.length }} properties</div>
-            </div>
-        </foreignObject>
     </g>
 </template>
 
@@ -90,6 +77,8 @@ interface Emits {
     (e: 'dragEnd', node: GraphNode): void
     (e: 'focus', node: GraphNode): void
     (e: 'blur', node: GraphNode): void
+    (e: 'tooltipShow', node: GraphNode): void
+    (e: 'tooltipHide', node: GraphNode): void
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -240,27 +229,7 @@ const getPropertyBgColor = (property: NodeProperty, index: number): string => {
     return 'transparent'
 }
 
-// Tooltip properties
-const tooltipX = computed(() => nodeWidth.value + 10)
-const tooltipY = computed(() => -10)
-const tooltipWidth = computed(() => 220)
-const tooltipHeight = computed(() => 100)
 
-const tooltipValue = computed(() => {
-    const value = props.node.value
-    if (value === null) return 'null'
-    if (typeof value === 'string') {
-        return value.length > 50 ? `"${value.substring(0, 50)}..."` : `"${value}"`
-    }
-    if (typeof value === 'object') {
-        if (Array.isArray(value)) {
-            return `Array(${value.length})`
-        }
-        const keys = Object.keys(value as Record<string, unknown>)
-        return `Object(${keys.length} keys)`
-    }
-    return String(value)
-})
 
 // Property hover state
 const hoveredPropertyIndex = ref<number | null>(null)
@@ -279,11 +248,13 @@ const handleDoubleClick = (event: MouseEvent) => {
 const handleMouseEnter = () => {
     isHovered.value = true
     showTooltip.value = true
+    emit('tooltipShow', props.node)
 }
 
 const handleMouseLeave = () => {
     isHovered.value = false
     showTooltip.value = false
+    emit('tooltipHide', props.node)
 }
 
 const handleContextMenu = (event: MouseEvent) => {
@@ -459,62 +430,7 @@ const handleMouseUp = () => {
     filter: drop-shadow(0 0 6px rgba(0, 122, 204, 0.4));
 }
 
-/* Tooltip styles */
-.tooltip-container {
-    pointer-events: none;
-    z-index: 1000;
-}
 
-.tooltip {
-    background: rgba(0, 0, 0, 0.9);
-    color: white;
-    padding: 10px 14px;
-    border-radius: 8px;
-    font-size: 12px;
-    font-family: system-ui, -apple-system, sans-serif;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    max-width: 200px;
-    word-wrap: break-word;
-}
-
-.tooltip-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 6px;
-    font-weight: 600;
-}
-
-.tooltip-key {
-    color: #fbbf24;
-    font-family: 'Monaco', 'Consolas', monospace;
-}
-
-.tooltip-type {
-    color: #a78bfa;
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.tooltip-value {
-    color: #e5e7eb;
-    margin-bottom: 4px;
-    font-family: 'Monaco', 'Consolas', monospace;
-    font-size: 11px;
-}
-
-.tooltip-path {
-    color: #9ca3af;
-    font-size: 10px;
-    font-style: italic;
-    margin-bottom: 4px;
-}
-
-.tooltip-properties {
-    color: #9ca3af;
-    font-size: 10px;
-}
 
 /* Type-specific styling */
 .node-type-object .node-header {

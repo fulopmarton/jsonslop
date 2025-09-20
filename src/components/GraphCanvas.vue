@@ -28,7 +28,24 @@
                         :is-selected="isNodeSelected(node.id)" :is-highlighted="isNodeHighlighted(node.id)"
                         :show-labels="true" @click="handleNodeClick" @double-click="handleNodeDoubleClick"
                         @context-menu="handleNodeContextMenu" @drag-start="handleNodeDragStart" @drag="handleNodeDrag"
-                        @drag-end="handleNodeDragEnd" @focus="handleNodeFocus" @blur="handleNodeBlur" />
+                        @drag-end="handleNodeDragEnd" @focus="handleNodeFocus" @blur="handleNodeBlur"
+                        @tooltip-show="handleTooltipShow" @tooltip-hide="handleTooltipHide" />
+                </g>
+
+                <!-- Tooltips layer - rendered on top of all nodes -->
+                <g class="tooltips-group">
+                    <foreignObject v-if="tooltipNode" :x="tooltipX" :y="tooltipY" :width="tooltipWidth"
+                        :height="tooltipHeight" class="tooltip-container">
+                        <div class="tooltip" xmlns="http://www.w3.org/1999/xhtml">
+                            <div class="tooltip-header">
+                                <span class="tooltip-key">{{ tooltipNode.key }}</span>
+                                <span class="tooltip-type">{{ tooltipNode.type.toUpperCase() }}</span>
+                            </div>
+                            <div class="tooltip-value">{{ tooltipValue }}</div>
+                            <div class="tooltip-path">{{ tooltipNode.path.join('.') || 'root' }}</div>
+                            <div class="tooltip-properties">{{ tooltipNode.properties.length }} properties</div>
+                        </div>
+                    </foreignObject>
                 </g>
             </g>
         </svg>
@@ -173,6 +190,41 @@ const graphSearch = useGraphSearch({
 // State
 const isLoading = ref(false)
 
+// Tooltip state
+const tooltipNode = ref<GraphNode | null>(null)
+
+// Tooltip computed properties
+const tooltipX = computed(() => {
+    if (!tooltipNode.value) return 0
+    const nodeWidth = tooltipNode.value.width || 150
+    return (tooltipNode.value.x || 0) + nodeWidth + 10
+})
+
+const tooltipY = computed(() => {
+    if (!tooltipNode.value) return 0
+    return (tooltipNode.value.y || 0) - 10
+})
+
+const tooltipWidth = computed(() => 220)
+const tooltipHeight = computed(() => 100)
+
+const tooltipValue = computed(() => {
+    if (!tooltipNode.value) return ''
+    const value = tooltipNode.value.value
+    if (value === null) return 'null'
+    if (typeof value === 'string') {
+        return value.length > 50 ? `"${value.substring(0, 50)}..."` : `"${value}"`
+    }
+    if (typeof value === 'object') {
+        if (Array.isArray(value)) {
+            return `Array(${value.length})`
+        }
+        const keys = Object.keys(value as Record<string, unknown>)
+        return `Object(${keys.length} keys)`
+    }
+    return String(value)
+})
+
 // Initialize native layout
 const initializeLayout = () => {
     if (props.nodes.length === 0) {
@@ -255,9 +307,19 @@ const getLinkOpacity = (link: GraphLink): number => {
 }
 
 const getLinkPath = (link: GraphLink): string => {
+    // Get actual node dimensions instead of using hardcoded values
+    const sourceId = getNodeId(link.source)
+    const targetId = getNodeId(link.target)
+    const sourceNode = layout.nodes.value.find(n => n.id === sourceId)
+    const targetNode = layout.nodes.value.find(n => n.id === targetId)
+
+    // Use actual node dimensions or fallback to defaults
+    const nodeWidth = sourceNode?.width || 150
+    const nodeHeight = sourceNode?.height || 80
+
     const linkPath = calculateLinkPath(link, layout.nodes.value, {
-        nodeWidth: 160,
-        nodeHeight: 80,
+        nodeWidth,
+        nodeHeight,
         headerHeight: 24,
         propertyHeight: 20,
         curvature: 0.4
@@ -325,6 +387,16 @@ const handleNodeDrag = (node: GraphNode) => {
 const handleNodeDragEnd = (node: GraphNode) => {
     // Optionally restart layout after drag
     // layout.start()
+}
+
+const handleTooltipShow = (node: GraphNode) => {
+    tooltipNode.value = node
+}
+
+const handleTooltipHide = (node: GraphNode) => {
+    if (tooltipNode.value?.id === node.id) {
+        tooltipNode.value = null
+    }
 }
 
 // Render the complete graph
@@ -540,5 +612,62 @@ defineExpose({
 
 :deep(.node:hover circle) {
     filter: brightness(1.1);
+}
+
+/* Tooltip styles */
+.tooltip-container {
+    pointer-events: none;
+    z-index: 1000;
+}
+
+.tooltip {
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-family: system-ui, -apple-system, sans-serif;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    max-width: 200px;
+    word-wrap: break-word;
+}
+
+.tooltip-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    font-weight: 600;
+}
+
+.tooltip-key {
+    color: #fbbf24;
+    font-family: 'Monaco', 'Consolas', monospace;
+}
+
+.tooltip-type {
+    color: #a78bfa;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.tooltip-value {
+    color: #e5e7eb;
+    margin-bottom: 4px;
+    font-family: 'Monaco', 'Consolas', monospace;
+    font-size: 11px;
+}
+
+.tooltip-path {
+    color: #9ca3af;
+    font-size: 10px;
+    font-style: italic;
+    margin-bottom: 4px;
+}
+
+.tooltip-properties {
+    color: #9ca3af;
+    font-size: 10px;
 }
 </style>

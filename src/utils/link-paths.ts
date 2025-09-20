@@ -23,7 +23,7 @@ export interface ConnectionPoint {
 export function getPropertyConnectionPoint(
   node: GraphNode,
   propertyKey: string | number,
-  nodeWidth: number = 160,
+  nodeWidth: number = 150,
   headerHeight: number = 24,
   propertyHeight: number = 20,
 ): ConnectionPoint | null {
@@ -51,7 +51,7 @@ export function getPropertyConnectionPoint(
  */
 export function getNodeEntryPoint(
   node: GraphNode,
-  nodeWidth: number = 160,
+  nodeWidth: number = 150,
   nodeHeight: number = 80,
 ): ConnectionPoint {
   const x = node.x || 0
@@ -66,7 +66,7 @@ export function getNodeEntryPoint(
 export function findSourceConnectionPoint(
   sourceNode: GraphNode,
   targetNode: GraphNode,
-  nodeWidth: number = 160,
+  nodeWidth: number = 150,
   headerHeight: number = 24,
   propertyHeight: number = 20,
 ): ConnectionPoint | null {
@@ -113,8 +113,8 @@ export function calculateLinkPath(
   } = {},
 ): LinkPath | null {
   const {
-    nodeWidth = 160,
-    nodeHeight = 80,
+    nodeWidth: defaultNodeWidth = 150,
+    nodeHeight: defaultNodeHeight = 80,
     headerHeight = 24,
     propertyHeight = 20,
     curvature = 0.5,
@@ -129,21 +129,27 @@ export function calculateLinkPath(
 
   if (!sourceNode || !targetNode) return null
 
-  // Calculate connection points
+  // Use actual node dimensions or fallback to defaults
+  const sourceNodeWidth = sourceNode.width || defaultNodeWidth
+  const sourceNodeHeight = sourceNode.height || defaultNodeHeight
+  const targetNodeWidth = targetNode.width || defaultNodeWidth
+  const targetNodeHeight = targetNode.height || defaultNodeHeight
+
+  // Calculate connection points using actual node dimensions
   const sourcePoint = findSourceConnectionPoint(
     sourceNode,
     targetNode,
-    nodeWidth,
+    sourceNodeWidth,
     headerHeight,
     propertyHeight,
   )
-  const targetPoint = getNodeEntryPoint(targetNode, nodeWidth, nodeHeight)
+  const targetPoint = getNodeEntryPoint(targetNode, targetNodeWidth, targetNodeHeight)
 
   if (!sourcePoint) {
     // Fallback to node center if no specific property connection found
     const fallbackSource = {
-      x: (sourceNode.x || 0) + nodeWidth,
-      y: (sourceNode.y || 0) + nodeHeight / 2,
+      x: (sourceNode.x || 0) + sourceNodeWidth,
+      y: (sourceNode.y || 0) + sourceNodeHeight / 2,
     }
 
     return {

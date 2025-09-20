@@ -69,7 +69,7 @@ export function useNativeLayout(options: Partial<NativeLayoutOptions> = {}): Use
   const hierarchicalLayout = new HierarchicalLayout({
     nodeSpacing: layoutOptions.value.nodeSpacing,
     levelSpacing: layoutOptions.value.levelSpacing,
-    nodeWidth: 160,
+    nodeWidth: 150,
     nodeHeight: 80,
     direction: 'horizontal',
     padding: {
