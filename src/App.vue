@@ -6,6 +6,8 @@ import JSONInputPanel from '@/components/JSONInputPanel.vue'
 import VisualizationPanel from '@/components/VisualizationPanel.vue'
 import ViewToggle from '@/components/ViewToggle.vue'
 import { useJsonStore } from '@/stores/json'
+import { Analytics } from '@vercel/analytics/vue';
+
 
 // Store integration for global error handling
 const jsonStore = useJsonStore()
@@ -84,6 +86,7 @@ const retryOperation = () => {
 </script>
 
 <template>
+  <Analytics></Analytics>
   <div id="app" class="h-screen bg-gray-50 flex flex-col">
     <!-- Header -->
     <header class="bg-white dark:bg-gray-900 shadow-sm border-b px-4 sm:px-6 py-4 flex-shrink-0"

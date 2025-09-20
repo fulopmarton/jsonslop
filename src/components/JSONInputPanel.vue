@@ -464,6 +464,24 @@ const applyJsonFix = () => {
     jsonStore.applyJsonFix()
 }
 
+// Test broken JSON
+const testBrokenJson = () => {
+    const brokenExamples = [
+        `{\"name\": \"John\", \"age\": 30}`, // Escaped JSON (your example)
+        `{'name': 'John', 'age': 30}`, // Single quotes
+        `{"name": "John", "age": 30,}`, // Trailing comma
+        `{name: "John", age: 30}`, // Unquoted keys
+        `"{"name": "John", "age": 30}"`, // Wrapped in quotes
+        `"{\"name\": \"John\", \"age\": 30}"` // Double wrapped and escaped
+    ]
+
+    const randomExample = brokenExamples[Math.floor(Math.random() * brokenExamples.length)]
+    console.log('Testing with broken JSON:', randomExample)
+    if (editor) {
+        editor.setValue(randomExample)
+    }
+}
+
 // Debug computed properties
 watch(canFixJson, (newValue) => {
     console.log('canFixJson changed:', newValue)

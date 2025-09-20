@@ -89,10 +89,10 @@ export class JSONFixer {
   private static fixEscapedJSON(input: string, result: JSONFixResult): string {
     const trimmed = input.trim()
 
-    // Check if it looks like escaped JSON
-    if (trimmed.includes('\\"') && (trimmed.includes('\\n') || trimmed.includes('\\{'))) {
+    // Check if it looks like escaped JSON - be more flexible with detection
+    if (trimmed.includes('\\"')) {
       try {
-        // Try to parse as an escaped string
+        // Try to parse as an escaped string first
         const unescaped = JSON.parse(`"${trimmed}"`)
         if (this.looksLikeJSON(unescaped) && this.isValidJSON(unescaped)) {
           result.fixes.push({
@@ -119,6 +119,20 @@ export class JSONFixer {
           })
           return manuallyUnescaped
         }
+      }
+    }
+
+    // Also check for simple cases where the JSON is just escaped without extra wrapping
+    // Example: {\"name\": \"John\"} should become {"name": "John"}
+    if (trimmed.includes('\\"') && !trimmed.startsWith('"') && !trimmed.endsWith('"')) {
+      const simpleUnescape = trimmed.replace(/\\"/g, '"')
+      if (this.isValidJSON(simpleUnescape)) {
+        result.fixes.push({
+          description: 'Remove escape characters from JSON strings',
+          type: 'encoding',
+          severity: 'high',
+        })
+        return simpleUnescape
       }
     }
 
