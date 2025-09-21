@@ -272,7 +272,7 @@ const getNodeY = (nodeRef: string | GraphNode): number => {
 const getLinkStroke = (link: GraphLink): string => {
   const sourceId = getNodeId(link.source)
   const targetId = getNodeId(link.target)
-  
+
   // Check if either node is highlighted
   if (isNodeHighlighted(sourceId) && isNodeHighlighted(targetId)) {
     return '#007acc'
@@ -283,7 +283,7 @@ const getLinkStroke = (link: GraphLink): string => {
 const getLinkStrokeWidth = (link: GraphLink): number => {
   const sourceId = getNodeId(link.source)
   const targetId = getNodeId(link.target)
-  
+
   // Thicker stroke for highlighted connections
   if (isNodeHighlighted(sourceId) && isNodeHighlighted(targetId)) {
     return 3

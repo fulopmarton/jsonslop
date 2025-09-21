@@ -2,6 +2,7 @@
 // JSON Visualization App - Main Application Component
 import { ref, onErrorCaptured, computed } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useLocalStorage } from '@vueuse/core'
 import JSONInputPanel from '@/components/JSONInputPanel.vue'
 import VisualizationPanel from '@/components/VisualizationPanel.vue'
 import ViewToggle from '@/components/ViewToggle.vue'
@@ -15,7 +16,7 @@ const { hasValidJson, rawJsonInput } = storeToRefs(jsonStore)
 
 // State for managing the resizable split pane
 const isResizing = ref(false)
-const leftPanelWidth = ref(50) // Percentage width of left panel
+const leftPanelWidth = useLocalStorage('jsonslop:leftPanelWidth', 50) // Percentage width of left panel
 
 // Global error handling state
 const globalError = ref<string | null>(null)

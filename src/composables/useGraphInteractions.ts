@@ -277,12 +277,13 @@ export function useGraphInteractions(options: GraphInteractionOptions = {}) {
     // Get path to root
     let current = nodeId
     while (current && current !== 'root') {
-      const parentLink = links.find(link => {
+      const parentLink = links.find((link) => {
         const targetId = typeof link.target === 'string' ? link.target : link.target.id
         return targetId === current
       })
       if (parentLink) {
-        const parentId = typeof parentLink.source === 'string' ? parentLink.source : parentLink.source.id
+        const parentId =
+          typeof parentLink.source === 'string' ? parentLink.source : parentLink.source.id
         connected.add(parentId)
         current = parentId
       } else {
