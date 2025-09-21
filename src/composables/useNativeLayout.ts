@@ -3,9 +3,9 @@
  * Provides hierarchical and force-directed layout algorithms
  */
 
-import { ref, computed, type Ref } from 'vue'
+import { ref, type Ref } from 'vue'
 import type { GraphNode, GraphLink, LayoutStats } from '@/types'
-import { HierarchicalLayout, type HierarchicalLayoutOptions } from '@/utils/hierarchical-layout'
+import { HierarchicalLayout } from '@/utils/hierarchical-layout'
 
 export interface NativeLayoutOptions {
   width: number
@@ -87,13 +87,10 @@ export function useNativeLayout(options: Partial<NativeLayoutOptions> = {}): Use
     // Set canvas dimensions for proper centering
     hierarchicalLayout.setCanvasDimensions(layoutOptions.value.width, layoutOptions.value.height)
 
-    // Calculate optimal spacing based on node content
-    const optimalSpacing = hierarchicalLayout.calculateOptimalSpacing(nodeList)
-
-    // Update hierarchical layout options with optimal spacing
+    // Update hierarchical layout options
     hierarchicalLayout.updateOptions({
-      nodeSpacing: Math.max(layoutOptions.value.nodeSpacing, optimalSpacing.nodeSpacing),
-      levelSpacing: Math.max(layoutOptions.value.levelSpacing, optimalSpacing.levelSpacing),
+      nodeSpacing: layoutOptions.value.nodeSpacing,
+      levelSpacing: layoutOptions.value.levelSpacing,
     })
 
     // Calculate positions using the hierarchical layout engine

@@ -5,6 +5,7 @@
 
 // Import from main d3 package for better compatibility
 import * as d3 from 'd3'
+import { flextree } from 'd3-flextree'
 
 // Re-export specific functions for tree-shaking
 export const select = d3.select
@@ -31,6 +32,9 @@ export const hierarchy = d3.hierarchy
 export const tree = d3.tree
 
 export const transition = d3.transition
+
+// Export flextree
+export { flextree }
 
 export const easeCubicInOut = d3.easeCubicInOut
 export const easeLinear = d3.easeLinear
