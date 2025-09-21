@@ -1,6 +1,5 @@
 <template>
-  <div class="search-bar flex items-center space-x-2 p-3 border-b"
-    style="border-color: var(--border-primary); background-color: var(--bg-primary);">
+  <div class="search-bar flex items-center space-x-2">
     <!-- Search input -->
     <div class="flex-1 relative">
       <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">

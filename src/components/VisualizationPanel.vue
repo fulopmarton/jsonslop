@@ -1,8 +1,5 @@
 <template>
   <div class="visualization-panel h-full flex flex-col">
-    <!-- Search bar -->
-    <SearchBar v-if="hasValidJson" ref="searchBarRef" />
-
     <!-- Header with controls -->
     <div class="flex items-center justify-between p-3 sm:p-4 border-b"
       style="border-color: var(--border-primary); background-color: var(--bg-secondary);">
@@ -191,7 +188,6 @@
 import { ref, computed, onMounted, nextTick, onUnmounted } from 'vue'
 import { useJsonStore } from '@/stores/json'
 import TreeNode from './TreeNode.vue'
-import SearchBar from './SearchBar.vue'
 import GraphCanvas from './GraphCanvas.vue'
 import type { JSONNode, GraphNode } from '@/types'
 
@@ -202,7 +198,6 @@ const jsonStore = useJsonStore()
 const showCopyNotification = ref(false)
 const copyNotificationMessage = ref('')
 const treeNodeRefs = ref<Record<string, InstanceType<typeof TreeNode>>>({})
-const searchBarRef = ref<InstanceType<typeof SearchBar>>()
 const graphCanvasRef = ref<InstanceType<typeof GraphCanvas>>()
 const graphCanvasWidth = ref(800)
 const graphCanvasHeight = ref(600)

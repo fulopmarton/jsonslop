@@ -6,6 +6,7 @@ import { useLocalStorage } from '@vueuse/core'
 import JSONInputPanel from '@/components/JSONInputPanel.vue'
 import VisualizationPanel from '@/components/VisualizationPanel.vue'
 import ViewToggle from '@/components/ViewToggle.vue'
+import SearchBar from '@/components/SearchBar.vue'
 import { useJsonStore } from '@/stores/json'
 import { Analytics } from '@vercel/analytics/vue';
 
@@ -241,15 +242,12 @@ const retryOperation = () => {
         <!-- Right Panel - Visualization -->
         <div class="flex flex-col flex-1"
           :style="{ width: `${100 - leftPanelWidth}%`, backgroundColor: 'var(--bg-primary)' }">
-          <div class="panel-header">
-            <div class="flex items-center justify-between">
-              <div>
-                <h2 class="text-base sm:text-lg font-semibold" style="color: var(--text-primary);">Your JSON, Visualized
-                </h2>
-                <p class="text-xs sm:text-sm" style="color: var(--text-secondary);">Now we're cooking with data
-                </p>
+          <div class="panel-header p-3 sm:p-4 border-b" style="border-color: var(--border-primary); background-color: var(--bg-secondary);">
+            <div class="flex items-center justify-between gap-4">
+              <div class="flex-1">
+                <SearchBar v-if="hasValidJson" ref="searchBarRef" />
               </div>
-              <ViewToggle />
+              <ViewToggle class="flex-shrink-0" />
             </div>
           </div>
           <div class="flex-1 overflow-hidden">
