@@ -90,31 +90,7 @@ const retryOperation = () => {
 <template>
   <Analytics></Analytics>
   <div id="app" class="h-screen bg-gray-50 flex flex-col">
-    <!-- Header -->
-    <header class="bg-white dark:bg-gray-900 shadow-sm border-b px-4 sm:px-6 py-4 flex-shrink-0"
-      style="border-color: var(--border-primary);">
-      <div class="flex items-center justify-between">
-        <div class="min-w-0 flex-1">
-          <h1 class="text-xl sm:text-2xl font-bold truncate" style="color: var(--text-primary);">JsonSlop 🍲
-          </h1>
-          <p class="text-xs sm:text-sm mt-1 truncate" style="color: var(--text-secondary);">Making sense of your JSON
-            chaos, one slop at a time</p>
-        </div>
 
-        <!-- Global Status Indicator -->
-        <div class="flex items-center gap-2 sm:gap-3 ml-4">
-          <!-- Success Indicator -->
-          <div v-if="hasValidJson && hasContent" class="flex items-center gap-2 status-success">
-            <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd"
-                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                clip-rule="evenodd" />
-            </svg>
-            <span class="text-xs sm:text-sm font-medium hidden sm:inline">Ready</span>
-          </div>
-        </div>
-      </div>
-    </header>
 
     <!-- Global Error Banner -->
     <div v-if="globalError" data-testid="global-error-banner"
@@ -242,7 +218,8 @@ const retryOperation = () => {
         <!-- Right Panel - Visualization -->
         <div class="flex flex-col flex-1"
           :style="{ width: `${100 - leftPanelWidth}%`, backgroundColor: 'var(--bg-primary)' }">
-          <div class="panel-header p-3 sm:p-4 border-b" style="border-color: var(--border-primary); background-color: var(--bg-secondary);">
+          <div class="panel-header p-3 sm:p-4 border-b"
+            style="border-color: var(--border-primary); background-color: var(--bg-secondary);">
             <div class="flex items-center justify-between gap-4">
               <div class="flex-1">
                 <SearchBar v-if="hasValidJson" ref="searchBarRef" />
