@@ -34,8 +34,6 @@ export const useJsonStore = defineStore('json', () => {
 
   // Validation state
   const validationErrors = ref<ValidationError[]>([])
-  const validationWarnings = ref<ValidationError[]>([])
-  const validationSuggestions = ref<string[]>([])
   const validationResult = ref<ValidationResult | null>(null)
 
   // Tree state management
@@ -81,7 +79,6 @@ export const useJsonStore = defineStore('json', () => {
   // Validation status
   const validationStatus = computed(() => {
     if (hasErrors.value) return 'invalid'
-    if (hasWarnings.value) return 'warning'
     if (hasValidJson.value) return 'valid'
     if (rawJsonInput.value.trim()) return 'incomplete'
     return 'empty'
@@ -90,7 +87,7 @@ export const useJsonStore = defineStore('json', () => {
   // Computed properties
   const hasValidJson = computed(() => isValidJson.value && parsedJsonData.value !== null)
   const hasErrors = computed(() => validationErrors.value.length > 0)
-  const hasWarnings = computed(() => validationWarnings.value.length > 0)
+
   const totalNodes = computed(() => countNodes(jsonTree.value))
   const expandedNodeCount = computed(() => treeState.value.expandedNodes.size)
 
@@ -161,8 +158,6 @@ export const useJsonStore = defineStore('json', () => {
     switch (validationStatus.value) {
       case 'invalid':
         return `${validationErrors.value.length} error${validationErrors.value.length !== 1 ? 's' : ''} found`
-      case 'warning':
-        return `Valid JSON with ${validationWarnings.value.length} warning${validationWarnings.value.length !== 1 ? 's' : ''}`
       case 'valid':
         return `Valid JSON (${totalNodes.value} nodes)`
       case 'incomplete':
@@ -178,8 +173,6 @@ export const useJsonStore = defineStore('json', () => {
     switch (validationStatus.value) {
       case 'invalid':
         return 'red'
-      case 'warning':
-        return 'yellow'
       case 'valid':
         return 'green'
       case 'incomplete':
@@ -209,8 +202,6 @@ export const useJsonStore = defineStore('json', () => {
     try {
       // Clear previous state
       validationErrors.value = []
-      validationWarnings.value = []
-      validationSuggestions.value = []
 
       // Validate JSON
       const currentValidationResult: ValidationResult = validationService.validate(input)
@@ -218,8 +209,6 @@ export const useJsonStore = defineStore('json', () => {
 
       validationResult.value = currentValidationResult
       validationErrors.value = currentValidationResult.errors
-      validationWarnings.value = currentValidationResult.warnings
-      validationSuggestions.value = currentValidationResult.suggestions
       isValidJson.value = currentValidationResult.isValid
 
       if (currentValidationResult.isValid) {
@@ -457,8 +446,6 @@ export const useJsonStore = defineStore('json', () => {
     jsonTree.value = []
     isValidJson.value = false
     validationErrors.value = []
-    validationWarnings.value = []
-    validationSuggestions.value = []
     clearSearch()
     treeState.value.expandedNodes.clear()
     treeState.value.selectedNode = null
@@ -744,8 +731,6 @@ export const useJsonStore = defineStore('json', () => {
     jsonTree,
     isValidJson,
     validationErrors,
-    validationWarnings,
-    validationSuggestions,
     treeState,
     graphState,
     searchQuery,
@@ -755,7 +740,6 @@ export const useJsonStore = defineStore('json', () => {
     // Computed
     hasValidJson,
     hasErrors,
-    hasWarnings,
     totalNodes,
     expandedNodeCount,
     searchResults,

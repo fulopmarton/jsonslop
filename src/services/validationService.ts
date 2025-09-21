@@ -5,8 +5,6 @@ import { JSONFixer, type JSONFixResult } from '@/utils/json-preprocessor'
 export interface ValidationResult {
   isValid: boolean
   errors: ValidationError[]
-  warnings: ValidationError[]
-  suggestions: string[]
   fixResult?: JSONFixResult
 }
 

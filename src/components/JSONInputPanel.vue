@@ -98,7 +98,7 @@
             </svg>
             <div class="min-w-0 flex-1">
               <span class="font-medium status-error">Line {{ error.line }}, Column {{ error.column
-              }}:</span>
+                }}:</span>
               <span class="status-error ml-1 break-words">{{ error.message }}</span>
             </div>
           </div>
@@ -113,7 +113,7 @@
             </svg>
             <div class="min-w-0 flex-1">
               <span class="font-medium status-warning">Line {{ warning.line }}, Column {{ warning.column
-              }}:</span>
+                }}:</span>
               <span class="status-warning ml-1 break-words">{{ warning.message }}</span>
             </div>
           </div>
@@ -148,25 +148,7 @@
       </div>
     </div>
 
-    <!-- General Suggestions -->
-    <div v-if="validationSuggestions.length > 0" data-testid="suggestions-display"
-      class="border-t max-h-24 overflow-y-auto"
-      style="border-color: var(--border-primary); background-color: var(--bg-accent);">
-      <div class="p-3">
-        <div class="text-sm font-medium mb-1 status-info">Suggestions:</div>
-        <ul class="space-y-1">
-          <li v-for="(suggestion, index) in validationSuggestions" :key="index"
-            class="text-sm flex items-start gap-2 status-info">
-            <svg class="w-3 h-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                clip-rule="evenodd" />
-            </svg>
-            <span>{{ suggestion }}</span>
-          </li>
-        </ul>
-      </div>
-    </div>
+
   </div>
 </template>
 
@@ -204,7 +186,6 @@ const editorValue = ref('')
 
 // Computed properties
 const hasErrorsComputed = computed(() => validationErrors.value.length > 0)
-const hasWarningsComputed = computed(() => validationWarnings.value.length > 0)
 
 // Initialize Monaco Editor
 const initializeEditor = async () => {
@@ -400,24 +381,7 @@ const updateErrorDecorations = () => {
     }
   })
 
-  // Add warning decorations
-  validationWarnings.value.forEach((warning) => {
-    if (monacoInstance) {
-      decorations.push({
-        range: new monacoInstance.Range(warning.line, warning.column, warning.line, warning.column + 1),
-        options: {
-          isWholeLine: false,
-          className: 'warning-decoration',
-          glyphMarginClassName: 'warning-glyph',
-          hoverMessage: { value: warning.message },
-          minimap: {
-            color: '#ffaa00',
-            position: monacoInstance.editor.MinimapPosition.Inline
-          }
-        }
-      })
-    }
-  })
+
 
   if (decorations.length > 0) {
     editor.deltaDecorations([], decorations)
@@ -510,7 +474,7 @@ watch(rawJsonInput, (newValue) => {
 })
 
 // Watch for validation errors to update decorations
-watch([validationErrors, validationWarnings], () => {
+watch(validationErrors, () => {
   updateErrorDecorations()
 }, { deep: true })
 
