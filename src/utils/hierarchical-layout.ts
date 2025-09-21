@@ -46,7 +46,7 @@ export interface NodeLayout {
 }
 
 const DEFAULT_OPTIONS: HierarchicalLayoutOptions = {
-  nodeSpacing: 80, // Vertical spacing between siblings
+  nodeSpacing: 15, // Vertical spacing between siblings
   levelSpacing: 120, // Horizontal spacing between parent and child
   nodeWidth: 150,
   nodeHeight: 80,
@@ -137,16 +137,16 @@ export class HierarchicalLayout {
       })
       // Add spacing between nodes
       .spacing((a: HierarchyNode<GraphNode>, b: HierarchyNode<GraphNode>) => {
-        // If nodes are siblings, add normal spacing
+        // If nodes are siblings, use minimal spacing
         if (a.parent === b.parent) {
           return this.options.direction === 'horizontal' 
-            ? this.options.nodeSpacing  // Vertical spacing for horizontal layout
+            ? this.options.nodeSpacing * 0.2  // Minimal vertical spacing for siblings
             : this.options.levelSpacing // Horizontal spacing for vertical layout
         }
-        // If nodes are not siblings, add more spacing to prevent overlaps
+        // If nodes are not siblings, use slightly increased spacing
         return this.options.direction === 'horizontal'
-          ? this.options.nodeSpacing * 2
-          : this.options.levelSpacing * 2
+          ? this.options.nodeSpacing * 0.4
+          : this.options.levelSpacing
       })
 
     // Run the layout
