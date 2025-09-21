@@ -563,37 +563,39 @@ export const useJsonStore = defineStore('json', () => {
           },
         },
         sample_data: {
-          users: [
+          products: [
             {
-              id: 1,
-              name: 'Alice Developer',
-              email: 'alice@jsonslop.dev',
-              skills: ['JavaScript', 'Vue.js', 'JSON wrangling'],
-              active: true,
-              projects: 42,
+              id: "P001",
+              name: "Ergonomic Chair",
+              category: "Furniture",
+              price: 299.99,
+              specs: ["Adjustable Height", "Lumbar Support", "360° Rotation"],
+              inStock: true,
+              inventory: 42
             },
             {
-              id: 2,
-              name: 'Bob DataWrangler',
-              email: 'bob@jsonslop.dev',
-              skills: ['Python', 'Data Analysis', 'API Design'],
-              active: true,
-              projects: 37,
-            },
+              id: "P002",
+              name: "Standing Desk",
+              category: "Furniture",
+              price: 599.99,
+              specs: ["Electric Height Adjust", "Memory Settings", "Cable Management"],
+              inStock: true,
+              inventory: 37
+            }
           ],
-          config: {
-            api_endpoint: 'https://api.jsonslop.dev/v1',
-            timeout: 5000,
-            retry_attempts: 3,
+          settings: {
+            api_version: "v1",
+            timeout_ms: 5000,
+            retry_limit: 3,
             features: {
-              dark_mode: true,
+              dark_theme: true,
               auto_save: false,
               notifications: {
                 email: true,
                 push: false,
-                sms: null,
-              },
-            },
+                sms: null
+              }
+            }
           },
         },
         meta: {
