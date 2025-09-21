@@ -149,6 +149,7 @@ const {
   isNodeSelected,
   isNodeHighlighted,
   highlightConnectedNodes,
+  clearHighlights,
 } = useGraphInteractions({
   onNodeSelect: (node) => emit('nodeSelect', node),
   onNodeDoubleClick: (node) => emit('nodeDoubleClick', node, {} as MouseEvent),
@@ -271,13 +272,23 @@ const getNodeY = (nodeRef: string | GraphNode): number => {
 const getLinkStroke = (link: GraphLink): string => {
   const sourceId = getNodeId(link.source)
   const targetId = getNodeId(link.target)
-  return isNodeHighlighted(sourceId) || isNodeHighlighted(targetId) ? '#007acc' : '#666'
+  
+  // Check if either node is highlighted
+  if (isNodeHighlighted(sourceId) && isNodeHighlighted(targetId)) {
+    return '#007acc'
+  }
+  return '#666'
 }
 
 const getLinkStrokeWidth = (link: GraphLink): number => {
   const sourceId = getNodeId(link.source)
   const targetId = getNodeId(link.target)
-  return isNodeHighlighted(sourceId) || isNodeHighlighted(targetId) ? 3 : 1.5
+  
+  // Thicker stroke for highlighted connections
+  if (isNodeHighlighted(sourceId) && isNodeHighlighted(targetId)) {
+    return 3
+  }
+  return 1.5
 }
 
 const getLinkOpacity = (link: GraphLink): number => {
@@ -296,10 +307,13 @@ const getLinkOpacity = (link: GraphLink): number => {
   }
 
   // Handle selection highlighting
-  if (selectedNodeId.value && !isNodeHighlighted(sourceId) && !isNodeHighlighted(targetId)) {
-    return 0.3 // Dim non-connected links when a node is selected
+  if (selectedNodeId.value) {
+    if (isNodeHighlighted(sourceId) && isNodeHighlighted(targetId)) {
+      return 1 // Full opacity for highlighted connections
+    }
+    return 0.2 // Dim other links
   }
-  return 1
+  return 1 // Default opacity when no selection
 }
 
 const getLinkPath = (link: GraphLink): string => {
@@ -485,6 +499,9 @@ watch(() => selectedNodeId.value, (newSelectedId) => {
   if (newSelectedId) {
     // Highlight connected nodes when a node is selected
     highlightConnectedNodes(newSelectedId, props.links)
+  } else {
+    // Clear highlights when selection is removed
+    clearHighlights()
   }
 })
 

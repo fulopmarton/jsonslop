@@ -251,18 +251,44 @@ export function useGraphInteractions(options: GraphInteractionOptions = {}) {
     nodeId: string,
     links: { source: string | GraphNode; target: string | GraphNode }[],
   ): string[] => {
-    const connected = new Set<string>()
+    const connected = new Set<string>([nodeId]) // Include the selected node
+    const processed = new Set<string>()
 
-    links.forEach((link) => {
-      const sourceId = typeof link.source === 'string' ? link.source : link.source.id
-      const targetId = typeof link.target === 'string' ? link.target : link.target.id
+    // Recursively get all descendants
+    const addDescendants = (currentId: string) => {
+      if (processed.has(currentId)) return
+      processed.add(currentId)
+      connected.add(currentId)
 
-      if (sourceId === nodeId) {
-        connected.add(targetId)
-      } else if (targetId === nodeId) {
-        connected.add(sourceId)
+      // Find and process all children
+      links.forEach((link) => {
+        const sourceId = typeof link.source === 'string' ? link.source : link.source.id
+        if (sourceId === currentId) {
+          const targetId = typeof link.target === 'string' ? link.target : link.target.id
+          connected.add(targetId)
+          addDescendants(targetId)
+        }
+      })
+    }
+
+    // Process all descendants starting from the selected node
+    addDescendants(nodeId)
+
+    // Get path to root
+    let current = nodeId
+    while (current && current !== 'root') {
+      const parentLink = links.find(link => {
+        const targetId = typeof link.target === 'string' ? link.target : link.target.id
+        return targetId === current
+      })
+      if (parentLink) {
+        const parentId = typeof parentLink.source === 'string' ? parentLink.source : parentLink.source.id
+        connected.add(parentId)
+        current = parentId
+      } else {
+        break
       }
-    })
+    }
 
     return Array.from(connected)
   }
@@ -272,7 +298,7 @@ export function useGraphInteractions(options: GraphInteractionOptions = {}) {
     links: { source: string | GraphNode; target: string | GraphNode }[],
   ) => {
     const connectedIds = getConnectedNodeIds(nodeId, links)
-    connectedIds.push(nodeId) // Include the selected node itself
+    // Note: No need to push nodeId as getConnectedNodeIds now includes it
     highlightNodes(connectedIds)
   }
 
